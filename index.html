@@ -1,0 +1,2887 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Título atualizado para refletir a nova versão -->
+    <title>Prontuário de Pacientes (V2.7 - Agenda Integrada)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* --- Estilos Globais --- */
+        :root {
+            --cor-primaria: #005A9C;
+            --cor-secundaria: #17A2B8;
+            --cor-perigo: #DC3545;
+            --cor-sucesso: #28A745;
+            --cor-aviso: #ffc107;
+            --cor-texto: #212529;
+            --cor-fundo: #f8f9fa;
+            --cor-borda: #dee2e6;
+            --sombra-leve: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--cor-fundo);
+            color: var(--cor-texto);
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        /* --- TELA DE LOGIN --- */
+        #login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--cor-fundo);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        #login-box {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        
+        #login-box h1 {
+            color: var(--cor-primaria);
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1.8rem;
+        }
+        
+        #login-box p {
+            font-size: 0.9rem;
+            color: #555;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+
+        .login-grupo {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        select, input[type="text"], input[type="date"], input[type="password"], textarea, input[type="number"], input[type="search"] {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--cor-borda);
+            border-radius: 6px;
+            box-sizing: border-box; 
+            font-size: 1rem;
+            background-color: #fff;
+        }
+        
+        input[readonly] {
+            background-color: #e9ecef;
+            cursor: not-allowed;
+        }
+
+        input[type="text"]:focus, input[type="date"]:focus, input[type="password"]:focus, textarea:focus, select:focus, input[type="number"]:focus, input[type="search"]:focus {
+            outline: none;
+            border-color: var(--cor-primaria);
+            box-shadow: 0 0 5px rgba(0, 90, 156, 0.2);
+        }
+        
+        /* --- Container Principal da Aplicação --- */
+        #app-container {
+            display: none;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .container {
+            width: 100%;
+            margin-top: 20px;
+            padding: 30px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: var(--sombra-leve);
+            box-sizing: border-box;
+        }
+        
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        h1, h2, h3 {
+            color: #343a40;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+            margin-top: 10px;
+        }
+        h1 { margin-top: 0; font-size: 2rem; }
+        h2 { font-size: 1.7rem; }
+        h3 { 
+            font-size: 1.3rem; 
+            border-bottom: none; 
+            color: var(--cor-primaria);
+            margin-top: 25px;
+        }
+        
+        /* [MELHORIA 1] Header de Informações Críticas */
+        .info-critica-header {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 10px;
+            background-color: #fdfdfd;
+            border: 1px solid var(--cor-borda);
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-top: -10px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        .info-critica-header div {
+            color: #555;
+            overflow: hidden;
+        }
+        .info-critica-header strong {
+            color: var(--cor-primaria);
+            margin-right: 5px;
+        }
+        .info-critica-header span {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        #info-risco {
+            color: var(--cor-perigo);
+            font-weight: 600;
+        }
+        /* Fim da [MELHORIA 1] */
+
+        /* --- Gerenciamento de Pacientes --- */
+        .gerenciamento-paciente {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            align-items: flex-end;
+            margin-bottom: 30px;
+        }
+        
+        .gerenciamento-paciente .botoes-gerenciamento {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        /* --- Botões --- */
+        button {
+            padding: 12px 18px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        
+        button:active { transform: scale(0.98); }
+
+        .btn-primario { background-color: var(--cor-primaria); color: white; }
+        .btn-primario:hover { background-color: #004a80; }
+        
+        .btn-secundario { background-color: var(--cor-sucesso); color: white; }
+        .btn-secundario:hover { background-color: #218838; }
+
+        .btn-perigo { background-color: var(--cor-perigo); color: white; }
+        .btn-perigo:hover { background-color: #c82333; }
+        
+        .btn-terciario { background-color: #6c757d; color: white; }
+        .btn-terciario:hover { background-color: #5a6268; }
+        
+        .btn-aviso { background-color: var(--cor-aviso); color: var(--cor-texto); }
+        .btn-aviso:hover { background-color: #e0a800; }
+        
+        .btn-link {
+            background: none;
+            color: var(--cor-primaria);
+            text-decoration: underline;
+            padding: 0;
+        }
+        
+        /* [MELHORIA 4 - RPD] Botão de ação menor */
+        .btn-link-perigo {
+            background: none;
+            color: var(--cor-perigo);
+            text-decoration: none;
+            padding: 2px 4px;
+            font-size: 0.9rem;
+            margin-left: 10px;
+        }
+        .btn-link-perigo:hover { text-decoration: underline; }
+        
+        .btn-link-editar {
+             background: none;
+            color: var(--cor-secundaria);
+            text-decoration: none;
+            padding: 2px 4px;
+            font-size: 0.9rem;
+        }
+        .btn-link-editar:hover { text-decoration: underline; }
+        /* Fim da [MELHORIA 4 - RPD] */
+
+        .login-grupo button {
+            width: 100%;
+            padding: 14px;
+            font-size: 1.1rem;
+        }
+
+        /* --- Formulário do Prontuário --- */
+        .form-grupo { margin-bottom: 25px; }
+        
+        .form-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px 20px;
+        }
+        
+        .form-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px 20px;
+        }
+
+        /* --- Avaliação de Humor --- */
+        .avaliacao-humor {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 15px;
+            background-color: #fdfdfd;
+            border-radius: 8px;
+            border: 1px solid #f0f0f0;
+        }
+        .humor-emoji {
+            font-size: 3rem;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+            opacity: 0.5;
+            filter: grayscale(80%);
+        }
+        .humor-emoji:hover {
+            opacity: 1;
+            filter: grayscale(0%);
+            transform: scale(1.1);
+        }
+        .humor-emoji.selecionado {
+            opacity: 1;
+            filter: grayscale(0%);
+            transform: scale(1.15);
+            background-color: rgba(0, 90, 156, 0.1);
+        }
+        #humor-descricao {
+            text-align: center;
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--cor-primaria);
+            min-height: 20px;
+            margin-top: 15px;
+        }
+        
+        textarea {
+            min-height: 130px;
+            resize: vertical;
+        }
+
+        /* --- Botões de Ação do Formulário --- */
+        .botoes-acao {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+            /* [MELHORIA 4 - RPD] Ajuste para justificar botões */
+            justify-content: flex-start;
+            align-items: center;
+        }
+        /* [MELHORIA 4 - RPD] Botões de ação da aba RPD */
+        #tab-rpd .botoes-acao {
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
+        
+        /* --- Estilos das Abas --- */
+        .tab-nav {
+            display: flex;
+            border-bottom: 2px solid var(--cor-borda);
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        .tab-link {
+            background-color: transparent;
+            border: none;
+            padding: 14px 20px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #888;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+        .tab-link:hover { color: var(--cor-primaria); }
+        .tab-link.active {
+            color: var(--cor-primaria);
+            border-bottom-color: var(--cor-primaria);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* --- Plano de Ação Anterior --- */
+        .plano-anterior-display {
+            background-color: #fdfdfd;
+            border: 1px dashed var(--cor-borda);
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+            font-style: italic;
+            color: #555;
+            min-height: 50px;
+            white-space: pre-wrap;
+        }
+        
+        /* --- Diagrama de Conceitualização --- */
+        .diagrama-container {
+            border: 1px solid var(--cor-borda);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 15px;
+            background-color: #fff;
+        }
+        .diagrama-header {
+            background-color: #f8f9fa;
+            padding: 12px 15px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--cor-borda);
+            color: var(--cor-primaria);
+            font-size: 1.2rem;
+        }
+        .diagrama-cell {
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .diagrama-cell label {
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        .diagrama-cell textarea {
+            min-height: 100px;
+            background-color: #fdfdfd;
+        }
+        .diagrama-situacao-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            border-top: 1px solid var(--cor-borda);
+        }
+        .situacao-col { padding: 15px; }
+        .situacao-col:first-child { border-right: 1px solid var(--cor-borda); }
+        .situacao-col h4 {
+            font-size: 1.1rem;
+            color: var(--cor-primaria);
+            margin-top: 0;
+            border-bottom: 1px dashed var(--cor-borda);
+            padding-bottom: 8px;
+        }
+        .situacao-col .form-grupo { margin-bottom: 15px; }
+        .situacao-col .form-grupo:last-child { margin-bottom: 0; }
+        .situacao-col .form-grupo label {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .situacao-col .form-grupo textarea {
+            min-height: 60px;
+            font-size: 0.95rem;
+            padding: 8px 10px;
+        }
+
+        /* --- Histórico de Sessões --- */
+        .historico-lista {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        .historico-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border: 1px solid var(--cor-borda);
+            border-radius: 6px;
+            margin-bottom: 10px;
+            background-color: #fdfdfd;
+        }
+        .historico-item.hidden {
+            display: none;
+        }
+        .historico-item-info {
+            font-size: 1.1rem;
+        }
+        .historico-item-info strong {
+            color: var(--cor-primaria);
+            font-weight: 600;
+        }
+        .historico-item-info span {
+            font-size: 0.95rem;
+            color: #555;
+            margin-left: 10px;
+        }
+        
+        /* --- Container da Busca no Histórico --- */
+        #historico-busca-container {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        /* --- Caixa de Avaliação de Risco --- */
+        .risk-box {
+            background-color: #fff8f8;
+            border: 2px solid var(--cor-perigo);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .risk-box label {
+            color: var(--cor-perigo);
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+        .risk-box textarea {
+            min-height: 100px;
+            background-color: #fff;
+            border-color: #f5c6cb;
+        }
+        
+        /* [MELHORIA 2] Ajustes no Risk-Box da Sessão */
+        .risk-box .form-grid-2 {
+            gap: 10px 20px;
+            align-items: end;
+        }
+        .risk-box .form-grid-2 label {
+            font-size: 0.9rem !important; 
+            color: #333; 
+            margin-bottom: 5px;
+        }
+        .risk-box .form-grid-2 textarea {
+            min-height: 60px !important;
+        }
+        .risk-box .form-grid-2 input[type="number"] {
+            padding: 10px 14px;
+        }
+        /* Fim da [MELHORIA 2] */
+
+        /* --- [MELHORIA 4 - RPD] Estilos do Módulo RPD --- */
+        #rpd-form-container .diagrama-header {
+            background-color: #f0f8ff; /* Azul claro */
+            color: var(--cor-primaria);
+        }
+        #rpd-form-container {
+             border-color: #cce5ff;
+        }
+        .rpd-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+        }
+        .rpd-grid .form-grupo {
+            padding: 15px;
+            margin-bottom: 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .rpd-grid .col-span-2 {
+            grid-column: 1 / -1;
+        }
+        .rpd-grid .form-grupo:nth-child(odd) {
+            border-right: 1px solid #f0f0f0;
+        }
+        .rpd-grid textarea {
+            min-height: 100px;
+            font-size: 0.95rem;
+        }
+        #rpd-form .botoes-acao {
+            padding: 15px;
+            margin-top: 0;
+            border-top: 1px solid #f0f0f0;
+        }
+        /* Item da lista RPD (baseado no historico-item) */
+        .rpd-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border: 1px solid var(--cor-borda);
+            border-radius: 6px;
+            margin-bottom: 10px;
+            background-color: #fdfdfd;
+        }
+        .rpd-item-info {
+            font-size: 1.0rem;
+            /* Permite quebra de linha */
+            white-space: pre-wrap;
+            word-break: break-word;
+            flex-grow: 1;
+            margin-right: 15px;
+        }
+        .rpd-item-info strong {
+            color: var(--cor-primaria);
+            font-weight: 600;
+            display: block;
+        }
+        .rpd-item-info span {
+            font-size: 0.9rem;
+            color: #555;
+            font-style: italic;
+        }
+        .rpd-item-botoes {
+            display: flex;
+            flex-shrink: 0; /* Impede que os botões quebrem linha */
+        }
+        /* Fim da [MELHORIA 4 - RPD] */
+        
+        /* --- Container do Gráfico de Humor --- */
+        #moodChart-container {
+            padding: 20px;
+            border: 1px solid var(--cor-borda);
+            border-radius: 8px;
+            background-color: #fdfdfd;
+        }
+        
+        /* --- Notificação Toast --- */
+        #toast-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            background-color: var(--cor-sucesso);
+            color: white;
+            font-weight: 600;
+            z-index: 200;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-20px);
+            transition: all 0.3s ease-out;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+        }
+        #toast-notification.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        #toast-notification.success { background-color: var(--cor-sucesso); }
+        #toast-notification.error { background-color: var(--cor-perigo); }
+
+        /* --- Modal de Visualização --- */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 150;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .modal-backdrop.show {
+            display: flex;
+            opacity: 1;
+        }
+        .modal-content {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            width: 100%;
+            max-width: 700px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--sombra-leve);
+            transform: scale(0.95);
+            transition: transform 0.2s ease;
+        }
+        .modal-backdrop.show .modal-content {
+            transform: scale(1);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--cor-borda);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .modal-header h2 {
+            margin: 0;
+            padding: 0;
+            border: none;
+            color: var(--cor-primaria);
+        }
+        .modal-header button {
+            background: none;
+            border: none;
+            font-size: 2rem;
+            font-weight: 300;
+            line-height: 1;
+            padding: 0 5px;
+            color: #888;
+        }
+        .modal-body .view-grupo {
+            margin-bottom: 20px;
+        }
+        .modal-body .view-grupo strong {
+            display: block;
+            font-weight: 600;
+            color: var(--cor-primaria);
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+        .modal-body .view-grupo p {
+            margin: 0;
+            white-space: pre-wrap;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            min-height: 20px;
+            font-style: italic;
+        }
+        .modal-body .view-grupo p:empty::after {
+            content: '(Não preenchido)';
+            color: #999;
+        }
+        
+        /* [MELHORIA 2] Estilo do Risco no Modal */
+        #modal-risco {
+            color: var(--cor-perigo);
+            font-style: normal;
+            font-weight: 500;
+            background-color: #fff8f8;
+            border: 1px dashed var(--cor-perigo);
+        }
+
+        /* --- Menu Flutuante de Backup (FAB) --- */
+        .fab-container {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            z-index: 120;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .fab-main {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: var(--cor-primaria);
+            color: white;
+            font-size: 1.8rem;
+            line-height: 60px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+            padding: 0;
+        }
+        .fab-main:hover {
+            background-color: #004a80;
+            transform: scale(1.05);
+        }
+
+        .fab-menu {
+            display: none;
+            flex-direction: column;
+            margin-bottom: 15px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all 0.2s ease-out;
+        }
+        
+        .fab-container:hover .fab-menu {
+            display: flex;
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .fab-menu-item {
+            padding: 10px 16px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            white-space: nowrap;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+            border: none; 
+            display: block;
+        }
+        
+        #input-importar-backup {
+            display: none;
+        }
+        
+        /* --- [MUDANÇA V2.7 - AGENDA INTEGRADA] Estilos da Agenda --- */
+        #agenda-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed; /* Colunas com largura fixa */
+        }
+        #agenda-table th, 
+        #agenda-table td {
+            border: 1px solid var(--cor-borda);
+            padding: 4px;
+            vertical-align: top;
+            height: 80px; /* Altura mínima para cada slot */
+        }
+        #agenda-table th {
+            background-color: #f8f9fa;
+            color: var(--cor-primaria);
+            padding: 10px 4px;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+        #agenda-table .col-horario {
+            width: 70px;
+            font-weight: 600;
+            text-align: center;
+            vertical-align: middle;
+            font-size: 0.95rem;
+            padding: 10px 0;
+        }
+        
+        /* Célula da agenda */
+        .agenda-cell {
+            position: relative;
+            /* Espaço para os controles na parte inferior */
+            padding-bottom: 30px !important;
+            height: 100px !important; /* Aumenta a altura para caber o conteúdo e botões */
+        }
+        
+        /* Div que segura o conteúdo (texto ou paciente) */
+        .agenda-slot-content {
+            width: 100%;
+            height: calc(100% - 30px); /* Ocupa o espaço, exceto pelos controles */
+            min-height: 60px;
+        }
+        
+        /* Textarea de atividade personalizada */
+        .agenda-slot {
+            width: 100%;
+            height: 100%;
+            border: none;
+            resize: none;
+            padding: 6px;
+            box-sizing: border-box;
+            font-size: 0.9rem;
+            min-height: 60px;
+            background-color: transparent;
+        }
+        .agenda-slot:focus {
+            outline: 1px solid var(--cor-secundaria);
+            background-color: #fdfdfd;
+        }
+        
+        /* Bloco que exibe o paciente agendado */
+        .agenda-patient-block {
+            padding: 8px;
+            background-color: #e6f0f7; /* Azul claro */
+            border-radius: 6px;
+            height: 100%;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Link com o nome do paciente */
+        .agenda-patient-link {
+            font-weight: 600;
+            color: var(--cor-primaria);
+            text-decoration: none;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+        .agenda-patient-link:hover {
+            text-decoration: underline;
+        }
+        
+        /* Controles na parte inferior do slot */
+        .agenda-slot-controls {
+            position: absolute;
+            bottom: 4px;
+            left: 4px;
+            right: 4px;
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        /* Botão pequeno para os slots */
+        .btn-slot-control {
+            padding: 2px 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 4px;
+            line-height: 1.5;
+        }
+        /* --- [FIM DA MUDANÇA V2.7] --- */
+
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <div id="login-box">
+            <h1>Acesso Seguro</h1>
+            <p>Digite sua <strong>Senha Mestra</strong>. Ela é sua chave de criptografia. Se for seu primeiro acesso, a senha que você digitar será definida como sua chave.</p>
+            <form id="login-form">
+                <div class="login-grupo">
+                    <label for="login-password">Senha Mestra (Chave de Criptografia)</label>
+                    <input type="password" id="login-password" required>
+                </div>
+                <div class="login-grupo">
+                    <button type="submit" class="btn-primario">Entrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toast-notification">Mensagem</div>
+
+    <!-- Modal de Visualização de Sessão (Existente) -->
+    <div id="view-session-modal" class="modal-backdrop">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-titulo">Detalhes da Sessão</h2>
+                <button type="button" id="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="view-grupo">
+                    <strong>Humor:</strong>
+                    <p id="modal-humor"></p>
+                </div>
+                
+                <div class="view-grupo">
+                    <strong>Avaliação de Risco da Sessão:</strong>
+                    <p id="modal-risco"></p>
+                </div>
+                <div class="view-grupo">
+                    <strong>Acontecimentos Semanais:</strong>
+                    <p id="modal-acontecimentos"></p>
+                </div>
+                <div class="view-grupo">
+                    <strong>Habilidades e Pautas Trabalhadas:</strong>
+                    <p id="modal-habilidades"></p>
+                </div>
+                <div class="view-grupo">
+                    <strong>Status do Plano Anterior:</strong>
+                    <p id="modal-plano-anterior-status"></p>
+                </div>
+                <div class="view-grupo">
+                    <strong>Plano de Ação (Para esta semana):</strong>
+                    <p id="modal-plano-acao"></p>
+                </div>
+                <div class="view-grupo">
+                    <strong>Feedback da Sessão:</strong>
+                    <p id="modal-feedback"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- [NOVO V2.7] Modal para Adicionar Paciente na Agenda -->
+    <div id="agenda-patient-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>Adicionar Paciente ao Horário</h2>
+                <button type="button" id="agenda-modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Armazena qual slot (ex: 'seg-0700') está sendo editado -->
+                <input type="hidden" id="agenda-modal-target-slot">
+                
+                <div class="form-grupo">
+                    <label for="agenda-modal-select-paciente">Selecione o Paciente</label>
+                    <select id="agenda-modal-select-paciente">
+                        <option value="">-- Carregando... --</option>
+                    </select>
+                </div>
+                <div class="botoes-acao" style="justify-content: flex-end; margin-top: 10px;">
+                    <button type="button" id="agenda-modal-cancel-btn" class="btn-terciario">Cancelar</button>
+                    <button type="button" id="agenda-modal-confirm-btn" class="btn-primario">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="app-container">
+        <div class="container">
+            <div class="app-header">
+                <h1>Plataforma de Prontuários</h1>
+            </div>
+
+            <div class="tab-nav" style="margin-bottom: 25px;">
+                <button type="button" class="tab-link active" id="btn-main-tab-pacientes">Gestão de Pacientes</button>
+                <button type="button" class="tab-link" id="btn-main-tab-agenda">Agenda / Planner</button>
+            </div>
+
+            <div id="pacientes-view-container" style="display: block;">
+                <section class="gerenciamento-paciente">
+                    <div>
+                        <label for="select-paciente">Selecionar Paciente</label>
+                        <select id="select-paciente">
+                            <option value="">-- Selecione ou crie um novo --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="novo-paciente-nome">Ou criar novo paciente</label>
+                        <input type="text" id="novo-paciente-nome" placeholder="Nome completo do novo paciente">
+                    </div>
+                    <div class="botoes-gerenciamento">
+                        <button id="btn-adicionar-paciente" class="btn-secundario">Adicionar Paciente</button>
+                        <button id="btn-remover-paciente" class="btn-perigo">Remover Selecionado</button>
+                    </div>
+                </section>
+
+                <div id="prontuario-container" style="display: none;">
+                    <h2 id="nome-paciente-titulo">Prontuário</h2>
+
+                    <div id="paciente-info-critica" class="info-critica-header" style="display: none;"> <div><strong>Risco (Perfil):</strong> <span id="info-risco">N/A</span></div>
+                        <div><strong>Hipóteses (Conc.):</strong> <span id="info-hipoteses">N/A</span></div>
+                        <div><strong>Emergência (Perfil):</strong> <span id="info-emergencia">N/A</span></div>
+                    </div>
+                    <div class="tab-nav">
+                        <button type="button" class="tab-link active" data-tab="sessao">Nova Sessão</button>
+                        <button type="button" class="tab-link" data-tab="rpd">RPDs (TCC)</button>
+                        <button type="button" class="tab-link" data-tab="historico">Histórico</button>
+                        <button type="button" class="tab-link" data-tab="progresso">Progresso</button>
+                        <button type="button" class="tab-link" data-tab="perfil">Perfil da Paciente</button>
+                        <button type="button" class="tab-link" data-tab="conceitualizacao">Conceitualização</button>
+                    </div>
+
+                    <div id="tab-sessao" class="tab-content active">
+                        <form id="prontuario-form">
+                            <div class="form-grupo">
+                                <label for="data-sessao">Data da Sessão</label>
+                                <input type="date" id="data-sessao" required>
+                            </div>
+
+                            <div class="form-grupo">
+                                <h3>Avaliação de Humor</h3>
+                                <div class="avaliacao-humor">
+                                    <span class="humor-emoji" data-humor="Muito Ruim">😞</span>
+                                    <span class="humor-emoji" data-humor="Ruim">😕</span>
+                                    <span class="humor-emoji" data-humor="Neutro">😐</span>
+                                    <span class="humor-emoji" data-humor="Bom">🙂</span>
+                                    <span class="humor-emoji" data-humor="Muito Bom">😄</span>
+                                </div>
+                                <div id="humor-descricao"></div>
+                                <input type="hidden" id="humor-selecionado">
+                            </div>
+
+                            <div class="form-grupo">
+                                <label for="acontecimentos">Acontecimentos Semanais Relevantes</label>
+                                <textarea id="acontecimentos" placeholder="Descreva os principais eventos desde a última sessão..."></textarea>
+                            </div>
+
+                            <div class="form-grupo">
+                                <label for="habilidades">Habilidades e Pautas Trabalhadas na Sessão</label>
+                                <textarea id="habilidades" placeholder="Quais técnicas, habilidades ou tópicos foram o foco hoje..."></textarea>
+                            </div>
+
+                            <div class="form-grupo risk-box">
+                                <label for="sessao-risk-assessment">Avaliação de Risco (Sessão Atual)</label>
+                                <div class="form-grid-2">
+                                    <div>
+                                        <label for="sessao-risk-level">Nível de Risco de Suicídio (0=Nulo, 5=Extremo)</label>
+                                        <input type="number" id="sessao-risk-level" min="0" max="5" placeholder="0">
+                                    </div>
+                                    <div>
+                                        <label for="sessao-risk-notes">Notas de Risco (Ideação, plano, intento, etc.)</label>
+                                        <textarea id="sessao-risk-notes" placeholder="Descreva ideação, plano, intento..."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-grupo">
+                                <h3>Acompanhamento do Plano Anterior</h3>
+                                <label>Plano de ação definido na sessão anterior:</label>
+                                <blockquote class="plano-anterior-display" id="plano-anterior-display">
+                                    (Nenhuma sessão anterior encontrada.)
+                                </blockquote>
+                                <label for="plano-anterior-status">Status do plano de ação anterior:</label>
+                                <select id="plano-anterior-status">
+                                    <option value="N/A">N/A (Primeira sessão ou não definido)</option>
+                                    <option value="Realizado">Realizado</option>
+                                    <option value="Realizado Parcialmente">Realizado Parcialmente</option>
+                                    <option value="Não Realizado">Não Realizado</option>
+                                </select>
+                            </div>
+
+                            <div class="form-grupo">
+                                <label for="plano-acao">Plano de Ação (Tarefas para esta semana)</label>
+                                <textarea id="plano-acao" placeholder="Defina os próximos passos ou tarefas para o paciente..."></textarea>
+                            </div>
+
+                            <div class="form-grupo">
+                                <label for="feedback">Feedback da Sessão (Visão do Paciente)</label>
+                                <textarea id="feedback" placeholder="Como o paciente percebeu a sessão de hoje..."></textarea>
+                            </div>
+                            
+                            <div class="botoes-acao">
+                                <button type="button" id="btn-salvar-sessao" class="btn-primario">Salvar Sessão no Histórico</button>
+                                <button type="button" id="btn-baixar-sessao" class="btn-terciario">Baixar Apenas Esta Sessão (.txt)</button>
+                                <button type="button" id="btn-baixar-historico" class="btn-secundario">Baixar Histórico Completo (.txt)</button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <div id="tab-rpd" class="tab-content">
+                        <h3>Registros de Pensamentos Disfuncionais (TCC)</h3>
+                        
+                        <div class="botoes-acao">
+                            <button type="button" id="btn-toggle-rpd-form" class="btn-secundario">Adicionar Novo RPD</button>
+                        </div>
+
+                        <div id="rpd-form-container" class="diagrama-container" style="display: none; margin-top: 20px;">
+                            <div class="diagrama-header" id="rpd-form-titulo">Novo Registro de Pensamento</div>
+                            <form id="rpd-form">
+                                <input type="hidden" id="rpd-edit-id">
+                                
+                                <div class="form-grupo" style="padding: 15px 15px 0 15px;">
+                                    <label for="rpd-data">Data do Acontecimento</label>
+                                    <input type="date" id="rpd-data" required>
+                                </div>
+
+                                <div class="rpd-grid">
+                                    <div class="form-grupo col-span-2">
+                                        <label for="rpd-situacao">Situação</label>
+                                        <textarea id="rpd-situacao" placeholder="O que aconteceu? Onde? Quando? Com quem?"></textarea>
+                                    </div>
+                                    <div class="form-grupo">
+                                        <label for="rpd-pensamentoAutomatico">Pensamento(s) Automático(s)</label>
+                                        <textarea id="rpd-pensamentoAutomatico" placeholder="O que passou pela sua cabeça?"></textarea>
+                                    </div>
+                                    <div class="form-grupo">
+                                        <label for="rpd-emocao">Emoção(ões)</label>
+                                        <textarea id="rpd-emocao" placeholder="O que você sentiu? (Ex: Ansiedade 80%, Tristeza 50%)"></textarea>
+                                    </div>
+                                    <div class="form-grupo">
+                                        <label for="rpd-evidenciasApoiam">Evidências que Apoiam o PA</label>
+                                        <textarea id="rpd-evidenciasApoiam" placeholder="Fatos que comprovam o pensamento."></textarea>
+                                    </div>
+                                    <div class="form-grupo">
+                                        <label for="rpd-evidenciasContra">Evidências Contra o PA</label>
+                                        <textarea id="rpd-evidenciasContra" placeholder="Fatos que contestam o pensamento."></textarea>
+                                    </div>
+                                    <div class="form-grupo col-span-2">
+                                        <label for="rpd-pensamentoAlternativo">Pensamento Alternativo / Racional</label>
+                                        <textarea id="rpd-pensamentoAlternativo" placeholder="Qual seria uma forma mais equilibrada de ver a situação?"></textarea>
+                                    </div>
+                                    <div class="form-grupo col-span-2">
+                                        <label for="rpd-resultadoHumor">Resultado (Novo Humor)</label>
+                                        <textarea id="rpd-resultadoHumor" placeholder="Como você se sentiu depois? (Ex: Ansiedade 40%, Alívio 30%)"></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div class="botoes-acao">
+                                    <button type="button" id="btn-salvar-rpd" class="btn-primario">Salvar RPD</button>
+                                    <button type="button" id="btn-cancelar-rpd" class="btn-terciario">Cancelar</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <h3 style="margin-top: 30px;">Registros Salvos</h3>
+                        <ul id="rpd-lista" class="historico-lista">
+                            <li id="rpd-lista-vazia">Nenhum RPD registrado para este paciente.</li>
+                        </ul>
+                    </div>
+
+                    <div id="tab-historico" class="tab-content">
+                        <h3>Histórico de Sessões</h3>
+                        
+                        <div id="historico-busca-container">
+                            <input type="search" id="input-busca-historico" placeholder="Buscar por palavra-chave nas sessões...">
+                            <button type="button" id="btn-limpar-busca" class="btn-terciario">Limpar</button>
+                        </div>
+                        
+                        <ul id="historico-lista" class="historico-lista">
+                            <li id="historico-lista-vazia">Nenhuma sessão registrada para este paciente.</li>
+                        </ul>
+                    </div>
+
+                    <div id="tab-progresso" class="tab-content">
+                        <h3>Evolução de Humor vs. Risco</h3>
+                        <div id="moodChart-container">
+                            <canvas id="moodChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div id="tab-perfil" class="tab-content">
+                        <form id="perfil-form">
+                        
+                            <h3>Avaliação de Risco (Geral / Linha de Base)</h3>
+                            <div class="form-grupo risk-box">
+                                <label for="perfil-risk-assessment">Avaliação de Risco (Ex: Ideação suicida, auto/heteroagressividade, planos)</label>
+                                <textarea id="perfil-risk-assessment" placeholder="Descreva aqui fatores de risco, ideação, plano, intento, acesso a meios, etc..."></textarea>
+                            </div>
+                        
+                            <h3>Dados Sociodemográficos</h3>
+                            <div class="form-grid-3">
+                                <div class="form-grupo">
+                                    <label for="perfil-nome-completo">Nome completo</label>
+                                    <input type="text" id="perfil-nome-completo">
+                                </div>
+                                <div class="form-grupo">
+                                    <label for="perfil-data-nascimento">Data de nascimento</label>
+                                    <input type="date" id="perfil-data-nascimento">
+                                </div>
+                                <div class="form-grupo">
+                                    <label for="perfil-idade">Idade</label>
+                                    <input type="number" id="perfil-idade" readonly> </div>
+                                <div class="form-grupo">
+                                    <label for="perfil-telefone">Número de telefone (com DDD)</label>
+                                    <input type="text" id="perfil-telefone" placeholder="(XX) XXXXX-XXXX">
+                                </div>
+                                <div class="form-grupo">
+                                    <label for="perfil-genero">Gênero</label>
+                                    <input type="text" id="perfil-genero">
+                                </div>
+                                <div class="form-grupo">
+                                    <label for="perfil-estado-civil">Estado civil</label>
+                                    <input type="text" id="perfil-estado-civil">
+                                </div>
+                                 <div class="form-grupo">
+                                    <label for="perfil-raca-cor">Raça/cor</label>
+                                    <input type="text" id="perfil-raca-cor">
+                                </div>
+                                <div class="form-grupo">
+                                    <label for="perfil-ocupacao">Ocupação</label>
+                                    <input type="text" id="perfil-ocupacao">
+                                </div>
+                                 <div class="form-grupo">
+                                    <label for="perfil-religiao">Religião</label>
+                                    <input type="text" id="perfil-religiao">
+                                </div>
+                                <div class="form-grupo">
+                                    <label for="perfil-renda">Renda (Faixa ou valor)</label>
+                                    <input type="text" id="perfil-renda">
+                                </div>
+                                <div class="form-grupo">
+                                    <label for="perfil-filhos">Possui filhos(as)?</label>
+                                    <input type="text" id="perfil-filhos" placeholder="Ex: Sim, 1" or "Não">
+                                </div>
+                                 <div class="form-grupo">
+                                    <label for="perfil-contato-emergencia">Contato de emergência</label>
+                                    <input type="text" id="perfil-contato-emergencia" placeholder="Nome (Telefone)">
+                                </div>
+                            </div>
+                            <div class="form-grupo">
+                                <label for="perfil-endereco">Endereço completo</label>
+                                <textarea id="perfil-endereco" style="min-height: 80px;" placeholder="Rua, número, complemento, bairro, cidade, CEP..."></textarea>
+                            </div>
+                            
+                            <h3>Anamnese</h3>
+                            <div class="form-grupo"><label for="perfil-queixa-principal">Queixa principal (motivo da consulta)</label><textarea id="perfil-queixa-principal"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-indicacao">Quem te indicou meus serviços?</label><textarea id="perfil-indicacao" style="min-height: 60px;"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-expectativas">Expectativas do paciente para tratamento</label><textarea id="perfil-expectativas"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-porque-agora">Por que agora?</label><textarea id="perfil-porque-agora"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-outros-sintomas">Outros sintomas</label><textarea id="perfil-outros-sintomas"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-sintomas-passados">Sintomas passados</label><textarea id="perfil-sintomas-passados"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-estrategias">Estratégias de enfrentamento já desenvolvidas</label><textarea id="perfil-estrategias"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-interferencia">Interferência no cotidiano</label><textarea id="perfil-interferencia"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-teoria-paciente">A “teoria” do paciente</label><textarea id="perfil-teoria-paciente"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-contexto-social">Contexto social e dados demográficos (Anamnese)</label><textarea id="perfil-contexto-social" placeholder="Complemento aos dados sociodemográficos. Ex: Com quem mora..."></textarea></div>
+                            <div class="form-grupo"><label for="perfil-historia-vida">História de vida</label><textarea id="perfil-historia-vida"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-historia-familiar">História familiar</label><textarea id="perfil-historia-familiar"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-aspectos-culturais">Aspectos culturais</label><textarea id="perfil-aspectos-culturais"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-escola-educacao">Escola e educação</label><textarea id="perfil-escola-educacao" placeholder="Nível cursado, dificuldades, etc..."></textarea></div>
+                            <div class="form-grupo"><label for="perfil-relacao-trabalho">Relação com trabalho</label><textarea id="perfil-relacao-trabalho"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-relacionamentos-passados">Relacionamentos passados (dificuldades)</label><textarea id="perfil-relacionamentos-passados"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-dificuldades-passadas">Dificuldades psicológicas passadas</label><textarea id="perfil-dificuldades-passadas"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-acontecimentos-traumaticos">Acontecimentos traumáticos (abusos, agressões, violência)</label><textarea id_="" ="perfil-acontecimentos-traumaticos"></textarea></div>
+
+                            <h3>Aspectos Extras</h3>
+                            <div class="form-grupo"><label for="perfil-tratamentos-medicamentosos">Tratamentos medicamentosos prévios</label><textarea id="perfil-tratamentos-medicamentosos"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-tratamentos-psicologicos">Tratamentos psicológicos prévios (motivos para términos)</label><textarea id="perfil-tratamentos-psicologicos"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-abuso-substancias">Abuso de substâncias (Álcool e outras drogas)</label><textarea id="perfil-abuso-substancias"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-resistencia-psicofarmacologia">Resistência à psicofarmacologia</label><textarea id="perfil-resistencia-psicofarmacologia"></textarea></div>
+                            <div class="form-grupo"><label for="perfil-rotina">Rotina (Horários semanais e fins de semana)</label><textarea id="perfil-rotina" style="min-height: 200px;"></textarea></div>
+
+                            <div class="botoes-acao">
+                                <button type="button" id="btn-salvar-perfil" class="btn-primario">Salvar Perfil da Paciente</button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <div id="tab-conceitualizacao" class="tab-content">
+                        <form id="conceitualizacao-form">
+                            <h3>1. Dados Gerais</h3>
+                            <div class="form-grid-3">
+                                <div class="form-grupo"><label for="conceito-iniciais">Iniciais</label><input type="text" id="conceito-iniciais"></div>
+                                <div class="form-grupo"><label for="conceito-inicio-atend">Início dos Atendimentos</label><input type="date" id="conceito-inicio-atend"></div>
+                                <div class="form-grupo"><label for="conceito-sexo">Sexo</label><input type="text" id="conceito-sexo"></div>
+                                <div class="form-grupo"><label for="conceito-idade">Idade</label><input type="number" id="conceito-idade"></div>
+                                <div class="form-grupo"><label for="conceito-escolaridade">Escolaridade</label><input type="text" id="conceito-escolaridade"></div>
+                                <div class="form-grupo"><label for="conceito-profissao">Profissão/Ocupação</label><input type="text" id="conceito-profissao"></div>
+                            </div>
+                             <div class="form-grupo"><label for="conceito-outros-profs">Outros profissionais (motivo)</label><textarea id="conceito-outros-profs" style="min-height: 60px;"></textarea></div>
+                            
+                            <h3>2. Genetograma</h3>
+                            <div class="form-grupo"><label for="conceito-genetograma">Descrição do Genetograma</label><textarea id="conceito-genetograma" placeholder="Descreva as relações familiares, padrões, etc..."></textarea></div>
+                            
+                            <h3>3. Hipóteses Diagnósticas</h3>
+                            <div class="form-grupo"><label for="conceito-hipoteses">Hipóteses Diagnósticas e Critérios</label><textarea id="conceito-hipoteses" placeholder="Liste as hipóteses (ex: TAG, TDM) e os critérios DSM-5 observados..."></textarea></div>
+                            
+                            <h3>4. Uso de Medicação / Drogas</h3>
+                            <div class="form-grid-2">
+                                 <div class="form-grupo"><label for="conceito-med-psi-atual">Medicações Psiquiátricas atuais</label><textarea id="conceito-med-psi-atual" style="min-height: 80px;"></textarea></div>
+                                 <div class="form-grupo"><label for="conceito-med-psi-ant">Medicações Psiquiátricas anterior</label><textarea id="conceito-med-psi-ant" style="min-height: 80px;"></textarea></div>
+                                <div class="form-grupo"><label for="conceito-med-outras-atual">Medicações Não-Psiquiátricas atuais</label><textarea id="conceito-med-outras-atual" style="min-height: 80px;"></textarea></div>
+                                <div class="form-grupo"><label for="conceito-med-outras-ant">Medicações Não-Psiquiátricas anterior</label><textarea id="conceito-med-outras-ant" style="min-height: 80px;"></textarea></div>
+                                 <div class="form-grupo"><label for="conceito-drogas-atual">Uso de entorpecentes atual</label><textarea id="conceito-drogas-atual" style="min-height: 80px;"></textarea></div>
+                                <div class="form-grupo"><label for="conceito-drogas-ant">Uso de entorpecentes anterior</label><textarea id="conceito-drogas-ant" style="min-height: 80px;"></textarea></div>
+                            </div>
+                            
+                            <h3>5. Motivo da busca por atendimento</h3>
+                            <div class="form-grupo"><label for="conceito-motivo-busca">Motivo da busca por atendimento</label><textarea id="conceito-motivo-busca" style="min-height: 100px;"></textarea></div>
+                            
+                            <h3>6. Diagrama de Conceitualização Cognitiva</h3>
+                            <div class="diagrama-container">
+                                <div class="diagrama-header">Diagrama de Conceitualização</div>
+                                
+                                <div class="diagrama-cell"><label for="diag-dados-infancia">Dados relevantes da infância</label><textarea id="diag-dados-infancia" placeholder="Eventos marcantes, relação com cuidadores, traumas..."></textarea></div>
+                                <div class="diagrama-cell"><label for="diag-crencas-centrais">Crenças centrais</label><textarea id="diag-crencas-centrais" placeholder="Ex: Sou incapaz (Desamparo), Sou indesejável (Desamor)..."></textarea></div>
+                                <div class="diagrama-cell"><label for="diag-crencas-intermediarias">Crenças intermediárias (Regras, Atitudes, Suposições)</label><textarea id="diag-crencas-intermediarias" placeholder="Ex: Se eu falhar, então sou um fracasso. Devo agradar a todos..."></textarea></div>
+                                <div class="diagrama-cell"><label for="diag-estrategias">Estratégias compensatórias</label><textarea id="diag-estrategias" placeholder="Ex: Procrastinação, Evitação, Busca por aprovação, Hipercompensação..."></textarea></div>
+                                
+                                <div class="diagrama-situacao-grid">
+                                    <div class="situacao-col">
+                                        <h4>Situação 1</h4>
+                                        <div class="form-grupo"><label for="diag-sit1-situacao">Situação</label><textarea id="diag-sit1-situacao"></textarea></div>
+                                        <div class="form-grupo"><label for="diag-sit1-pa">Pensamento automático</label><textarea id="diag-sit1-pa"></textarea></div>
+                                        <div class="form-grupo"><label for="diag-sit1-significado">Significado do PA</label><textarea id="diag-sit1-significado"></textarea></div>
+                                        <div class="form-grupo"><label for="diag-sit1-emocao">Emoção</label><textarea id="diag-sit1-emocao"></textarea></div>
+                                        <div class="form-grupo"><label for="diag-sit1-comportamento">Comportamento</label><textarea id="diag-sit1-comportamento"></textarea></div>
+                                    </div>
+                                    <div class="situacao-col">
+                                        <h4>Situação 2</h4>
+                                        <div class="form-grupo"><label for="diag-sit2-situacao">Situação</label><textarea id="diag-sit2-situacao"></textarea></div>
+                                        <div class="form-grupo"><label for="diag-sit2-pa">Pensamento automático</label><textarea id="diag-sit2-pa"></textarea></div>
+                                        <div class="form-grupo"><label for="diag-sit2-significado">Significado do PA</label><textarea id="diag-sit2-significado"></textarea></div>
+                                        <div class="form-grupo"><label for="diag-sit2-emocao">Emoção</label><textarea id="diag-sit2-emocao"></textarea></div>
+                                        <div class="form-grupo"><label for="diag-sit2-comportamento">Comportamento</label><textarea id="diag-sit2-comportamento"></textarea></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h3>7. Focos do tratamento (metas e objetivos)</h3>
+                            <div class="form-grupo"><label for="conceito-focos">Focos do tratamento (metas e objetivos)</label><textarea id="conceito-focos" placeholder="Ex: Reduzir autoexigência, Trabalhar crenças, Desenvolver regulação emocional..."></textarea></div>
+                            
+                            <h3>8. Plano de tratamento (técnicas)</h3>
+                            <div class="form-grupo"><label for="conceito-plano">Plano de tratamento (especificar técnicas)</label><textarea id="conceito-plano" placeholder="Ex: Psicoeducação, RPD, Questionamento socrático, Técnicas de mindfulness..."></textarea></div>
+                            
+                            <h3>Dúvidas do Supervisionando</h3>
+                             <div class="form-grupo"><label for="conceito-duvida-diag">Dúvidas quanto ao diagnóstico</label><textarea id="conceito-duvida-diag" style="min-height: 80px;"></textarea></div>
+                             <div class="form-grupo"><label for="conceito-duvida-med">Dúvidas quanto à medicação</label><textarea id="conceito-duvida-med" style="min-height: 80px;"></textarea></div>
+                             <div class="form-grupo"><label for="conceito-duvida-conc">Dúvidas quanto à conceitualização</label><textarea id="conceito-duvida-conc" style="min-height: 80px;"></textarea></div>
+                             <div class="form-grupo"><label for="conceito-duvida-focos">Dúvidas quanto aos focos de tratamento</label><textarea id="conceito-duvida-focos" style="min-height: 80px;"></textarea></div>
+                             <div class="form-grupo"><label for="conceito-duvida-tec">Dúvidas quanto às técnicas/manejo do caso</label><textarea id="conceito-duvida-tec" style="min-height: 80px;"></textarea></div>
+                             <div class="form-grupo"><label for="conceito-duvida-outras">Demais dúvidas</label><textarea id="conceito-duvida-outras" style="min-height: 80px;"></textarea></div>
+
+                            <div class="botoes-acao">
+                                <button type="button" id="btn-salvar-conceitualizacao" class="btn-primario">Salvar Conceitualização</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div> 
+            
+            <!-- Container da Agenda (o JS irá popular isso) -->
+            <div id="agenda-view-container" style="display: none;">
+            </div>
+
+        </div>
+
+        <div class="fab-container">
+            <div class="fab-menu">
+                <button id="btn-exportar-backup" class="fab-menu-item btn-aviso">
+                    Exportar (JSON)
+                </button>
+                <label for="input-importar-backup" class="fab-menu-item btn-terciario">
+                    Importar (JSON)
+                </label>
+            </div>
+            <button type="button" class="fab-main">
+                💾
+            </button>
+        </div>
+        <input type="file" id="input-importar-backup" accept=".json" style="display: none;">
+
+    </div> 
+    
+    <script>
+        // --- Lógica de Event Listeners ---
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- Constantes Globais de Elementos ---
+            const selectPaciente = document.getElementById('select-paciente');
+            const novoPacienteInput = document.getElementById('novo-paciente-nome');
+            const prontuarioContainer = document.getElementById('prontuario-container');
+            const prontuarioForm = document.getElementById('prontuario-form');
+            const nomePacienteTitulo = document.getElementById('nome-paciente-titulo');
+            const dataSessaoInput = document.getElementById('data-sessao');
+            const humorSelecionadoInput = document.getElementById('humor-selecionado');
+            const humorDescricao = document.getElementById('humor-descricao');
+            const planoAnteriorDisplay = document.getElementById('plano-anterior-display');
+            const planoAnteriorStatus = document.getElementById('plano-anterior-status');
+            const toast = document.getElementById('toast-notification');
+            const modalBackdrop = document.getElementById('view-session-modal');
+            const modalCloseBtn = document.getElementById('modal-close-btn');
+            const historicoLista = document.getElementById('historico-lista');
+            // [MELHORIA 1] Elemento do Header Crítico
+            const infoCriticaHeader = document.getElementById('paciente-info-critica');
+            
+            // --- [MELHORIA 4 - RPD] Elementos do Módulo RPD ---
+            const rpdFormContainer = document.getElementById('rpd-form-container');
+            const rpdForm = document.getElementById('rpd-form');
+            const rpdFormTitulo = document.getElementById('rpd-form-titulo');
+            const rpdEditIdInput = document.getElementById('rpd-edit-id');
+            const rpdLista = document.getElementById('rpd-lista');
+            const rpdDataInput = document.getElementById('rpd-data');
+            // --- Fim da [MELHORIA 4 - RPD] ---
+            
+            // --- [NOVO V2.7] Elementos do Modal da Agenda ---
+            const agendaPatientModal = document.getElementById('agenda-patient-modal');
+            const agendaModalSelect = document.getElementById('agenda-modal-select-paciente');
+            const agendaModalTargetSlot = document.getElementById('agenda-modal-target-slot');
+            const agendaViewContainer = document.getElementById('agenda-view-container');
+            // --- Fim [NOVO V2.7] ---
+
+            // --- Variáveis de estado do App ---
+            let toastTimer;
+            let moodChartInstance = null;
+            let appMasterKey = null;
+
+            // --- Helpers de Notificação ---
+            function showToast(message, type = 'success') {
+                clearTimeout(toastTimer);
+                toast.textContent = message;
+                toast.className = 'show ' + type;
+                toastTimer = setTimeout(() => {
+                    toast.className = toast.className.replace('show', '');
+                }, 3000);
+            }
+            
+            // --- Helpers do DB com CRIPTOGRAFIA ---
+            
+            function dbSet(key, value) {
+                if (!appMasterKey) {
+                    console.error("ERRO FATAL: Chave mestra não definida. Impossível salvar.");
+                    showToast("Erro de segurança: Chave mestra não definida.", "error");
+                    return;
+                }
+                try {
+                    const dataString = JSON.stringify(value);
+                    const encryptedData = CryptoJS.AES.encrypt(dataString, appMasterKey).toString();
+                    localStorage.setItem(key, encryptedData);
+                } catch (e) {
+                    console.error("Erro ao criptografar:", e);
+                    showToast("Erro ao salvar dados criptografados.", "error");
+                }
+            }
+
+            function dbGet(key, defaultValue = null) {
+                if (!appMasterKey) {
+                     console.error("ERRO FATAL: Chave mestra não definida. Impossível carregar.");
+                     return defaultValue;
+                }
+                
+                const encryptedData = localStorage.getItem(key);
+                if (encryptedData === null) return defaultValue;
+                
+                try {
+                    const bytes = CryptoJS.AES.decrypt(encryptedData, appMasterKey);
+                    const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
+                    
+                    if (!decryptedData) {
+                        throw new Error("Dados não puderam ser descriptografados. Senha incorreta?");
+                    }
+                    
+                    return JSON.parse(decryptedData);
+                } catch (e) {
+                    console.error("Erro ao descriptografar:", e);
+                    throw new Error("Falha na descriptografia"); 
+                }
+            }
+            
+            function dbRemove(key) {
+                localStorage.removeItem(key);
+            }
+            
+            // --- Lógica de Login Criptografado ---
+            document.getElementById('login-form').addEventListener('submit', tentarLogin);
+
+            function tentarLogin(event) {
+                event.preventDefault(); 
+                
+                const senha = document.getElementById('login-password').value;
+                if (senha.length < 4) {
+                    showToast('Senha muito curta. Use pelo menos 4 caracteres.', 'error');
+                    return;
+                }
+                
+                appMasterKey = senha; 
+                
+                try {
+                    dbGet('pacientesLista', []); 
+                    
+                    document.getElementById('login-screen').style.display = 'none';
+                    document.getElementById('app-container').style.display = 'block';
+                    inicializarApp();
+                    
+                } catch (e) {
+                    appMasterKey = null; 
+                    showToast('Senha mestra incorreta.', 'error');
+                }
+            }
+
+            // --- Lógica de Inicialização do App ---
+            
+            function inicializarApp() {
+                carregarListaPacientes();
+                dataSessaoInput.valueAsDate = new Date();
+                
+                // [MUDANÇA V2.7] Gera a ESTRUTURA da agenda
+                gerarTabelaAgenda();
+                // [MUDANÇA V2.7] Carrega os DADOS da agenda
+                carregarAgenda(); 
+                
+                // Gerenciamento de Pacientes
+                selectPaciente.addEventListener('change', carregarProntuario);
+                document.getElementById('btn-adicionar-paciente').addEventListener('click', adicionarPaciente);
+                document.getElementById('btn-remover-paciente').addEventListener('click', removerPaciente);
+
+                // Backup
+                document.getElementById('btn-exportar-backup').addEventListener('click', exportarBackup);
+                document.getElementById('input-importar-backup').addEventListener('change', importarBackup);
+                
+                // Navegação Principal
+                document.getElementById('btn-main-tab-pacientes').addEventListener('click', () => mostrarViewPrincipal('pacientes'));
+                document.getElementById('btn-main-tab-agenda').addEventListener('click', () => mostrarViewPrincipal('agenda'));
+                
+                // Navegação por Abas (INTERNA do paciente)
+                document.querySelectorAll('#prontuario-container .tab-link').forEach(link => {
+                    link.addEventListener('click', (e) => mostrarTab(e.currentTarget.dataset.tab, e.currentTarget));
+                });
+                
+                // Aba de Sessão
+                document.querySelectorAll('.humor-emoji').forEach(emoji => {
+                    emoji.addEventListener('click', (e) => selecionarHumor(e.currentTarget.dataset.humor, e.currentTarget));
+                });
+                document.getElementById('btn-salvar-sessao').addEventListener('click', salvarSessao);
+                document.getElementById('btn-baixar-sessao').addEventListener('click', baixarSessaoAtualTXT);
+                document.getElementById('btn-baixar-historico').addEventListener('click', baixarHistoricoTXT);
+                
+                // Aba de Perfil
+                document.getElementById('btn-salvar-perfil').addEventListener('click', salvarPerfil);
+                document.getElementById('perfil-data-nascimento').addEventListener('change', calcularIdade);
+                
+                // Aba de Conceitualização
+                document.getElementById('btn-salvar-conceitualizacao').addEventListener('click', salvarConceitualizacao);
+                
+                // Aba de Histórico (Busca)
+                document.getElementById('input-busca-historico').addEventListener('input', (e) => {
+                    filtrarHistorico(e.target.value);
+                });
+                document.getElementById('btn-limpar-busca').addEventListener('click', () => {
+                    document.getElementById('input-busca-historico').value = '';
+                    filtrarHistorico('');
+                });
+                
+                // --- [MELHORIA 4 - RPD] Listeners do Módulo RPD ---
+                document.getElementById('btn-toggle-rpd-form').addEventListener('click', () => toggleRPDForm(true));
+                document.getElementById('btn-cancelar-rpd').addEventListener('click', () => toggleRPDForm(false));
+                document.getElementById('btn-salvar-rpd').addEventListener('click', salvarRPD);
+                
+                // Listener delegado para a lista de RPDs
+                rpdLista.addEventListener('click', (e) => {
+                    const editBtn = e.target.closest('.rpd-btn-editar');
+                    const deleteBtn = e.target.closest('.rpd-btn-deletar');
+                    
+                    if (editBtn) {
+                        carregarRPDParaEdicao(editBtn.dataset.id);
+                    } else if (deleteBtn) {
+                        deletarRPD(deleteBtn.dataset.id);
+                    }
+                });
+                // --- Fim da [MELHORIA 4 - RPD] ---
+                
+                // --- [MUDANÇA V2.7] Listeners da Agenda ---
+                // Listener delegado para cliques nos botões dos slots
+                agendaViewContainer.addEventListener('click', handleAgendaClick);
+                // Listeners do novo modal
+                document.getElementById('agenda-modal-close-btn').addEventListener('click', fecharModalAgenda);
+                document.getElementById('agenda-modal-cancel-btn').addEventListener('click', fecharModalAgenda);
+                document.getElementById('agenda-modal-confirm-btn').addEventListener('click', confirmarAddPacienteAgenda);
+                // Listener do botão Salvar Agenda (que é gerado dinamicamente)
+                // É preciso anexar ao container
+                agendaViewContainer.addEventListener('click', (e) => {
+                    if (e.target.id === 'btn-salvar-agenda') {
+                        salvarAgenda();
+                    }
+                });
+                // --- [FIM MUDANÇA V2.7] ---
+
+                // Modal
+                modalCloseBtn.addEventListener('click', () => modalBackdrop.classList.remove('show'));
+                modalBackdrop.addEventListener('click', (e) => {
+                    if (e.target === modalBackdrop) {
+                        modalBackdrop.classList.remove('show');
+                    }
+                });
+                
+                // Histórico (anexar listener na lista-pai)
+                historicoLista.addEventListener('click', (e) => {
+                    const target = e.target.closest('.historico-item-btn');
+                    if (target) {
+                        abrirModalSessao(target.dataset.id);
+                    }
+                });
+            }
+
+            // Função para alternar views principais
+            function mostrarViewPrincipal(viewId) {
+                const pacientesView = document.getElementById('pacientes-view-container');
+                // const agendaView = document.getElementById('agenda-view-container'); // Já está em cache (agendaViewContainer)
+                
+                const btnPacientes = document.getElementById('btn-main-tab-pacientes');
+                const btnAgenda = document.getElementById('btn-main-tab-agenda');
+
+                if (viewId === 'pacientes') {
+                    pacientesView.style.display = 'block';
+                    agendaViewContainer.style.display = 'none';
+                    btnPacientes.classList.add('active');
+                    btnAgenda.classList.remove('active');
+                } else { // 'agenda'
+                    pacientesView.style.display = 'none';
+                    agendaViewContainer.style.display = 'block';
+                    btnPacientes.classList.remove('active');
+                    btnAgenda.classList.add('active');
+                }
+            }
+            
+            // --- Lógica das Abas (INTERNAS do paciente) ---
+            function mostrarTab(tabId, elementoClicado) {
+                document.querySelectorAll('#prontuario-container .tab-content').forEach(tab => {
+                    tab.style.display = 'none';
+                    tab.classList.remove('active');
+                });
+                document.querySelectorAll('#prontuario-container .tab-link').forEach(link => {
+                    link.classList.remove('active');
+                });
+                
+                document.getElementById('tab-' + tabId).style.display = 'block';
+                document.getElementById('tab-' + tabId).classList.add('active');
+                elementoClicado.classList.add('active');
+                
+                if (tabId === 'progresso') {
+                    const nome = selectPaciente.value;
+                    if (nome) {
+                        carregarGraficosProgresso(nome);
+                    }
+                }
+            }
+
+            // --- Funções de Gerenciamento de Pacientes ---
+
+            function carregarListaPacientes() {
+                const pacientes = getPacientesDB();
+                selectPaciente.innerHTML = '<option value="">-- Selecione ou crie um novo --</option>';
+                pacientes.forEach(paciente => {
+                    const option = new Option(paciente, paciente);
+                    selectPaciente.add(option);
+                });
+            }
+
+            function adicionarPaciente() {
+                const nome = novoPacienteInput.value.trim();
+                if (!nome) {
+                    showToast('Por favor, insira um nome.', 'error');
+                    return;
+                }
+
+                const pacientes = getPacientesDB();
+                if (pacientes.includes(nome)) {
+                    showToast('Este paciente já existe.', 'error');
+                    return;
+                }
+
+                pacientes.push(nome);
+                dbSet('pacientesLista', pacientes);
+                
+                const option = new Option(nome, nome, true, true);
+                selectPaciente.add(option);
+                
+                novoPacienteInput.value = '';
+                carregarProntuario();
+                
+                document.getElementById('perfil-nome-completo').value = nome;
+                salvarPerfil(false);
+                
+                showToast(`Paciente "${nome}" adicionado!`, 'success');
+            }
+
+            function removerPaciente() {
+                const nome = selectPaciente.value;
+                if (!nome) {
+                    showToast('Selecione um paciente para remover.', 'error');
+                    return;
+                }
+
+                if (!confirm(`TEM CERTEZA que deseja remover "${nome}"? TODO O HISTÓRICO, o PERFIL, a CONCEITUALIZAÇÃO e os RPDs deste paciente serão perdidos permanentemente.`)) {
+                    return;
+                }
+
+                let pacientes = getPacientesDB();
+                pacientes = pacientes.filter(p => p !== nome);
+                dbSet('pacientesLista', pacientes);
+                dbRemove(`prontuario_${nome}`);
+                dbRemove(`perfil_${nome}`);
+                dbRemove(`conceitualizacao_${nome}`);
+                dbRemove(`rpd_${nome}`); // [MELHORIA 4 - RPD] Remove RPDs
+                
+                // [NOVO V2.7] Remover paciente da agenda
+                removerPacienteDaAgenda(nome);
+
+                carregarListaPacientes();
+                prontuarioContainer.style.display = 'none';
+                infoCriticaHeader.style.display = 'none';
+                showToast(`Paciente "${nome}" removido.`, 'success');
+            }
+            
+            // [NOVO V2.7] Função helper para limpar agenda ao remover paciente
+            function removerPacienteDaAgenda(nomePaciente) {
+                const agendaData = dbGet('agendaPlanner', {});
+                let agendaModificada = false;
+                
+                for (const key in agendaData) {
+                    const slot = agendaData[key];
+                    if (slot.type === 'patient' && slot.id === nomePaciente) {
+                        // Remove a entrada, revertendo para "vazio" (que será texto)
+                        delete agendaData[key];
+                        agendaModificada = true;
+                    }
+                }
+                
+                if (agendaModificada) {
+                    dbSet('agendaPlanner', agendaData);
+                    // Recarrega a agenda se ela estiver visível
+                    if (agendaViewContainer.style.display === 'block') {
+                        carregarAgenda();
+                    }
+                }
+            }
+
+            function getPacientesDB() {
+                return dbGet('pacientesLista', []);
+            }
+
+            function getHistoricoPaciente(nome) {
+                return dbGet(`prontuario_${nome}`, []);
+            }
+            
+            function getPerfilPaciente(nome) {
+                return dbGet(`perfil_${nome}`, {});
+            }
+            
+            function getConceitualizacaoPaciente(nome) {
+                return dbGet(`conceitualizacao_${nome}`, {});
+            }
+            
+            // [MELHORIA 4 - RPD] Helper para RPDs
+            function getRPDsPaciente(nome) {
+                return dbGet(`rpd_${nome}`, []);
+            }
+            // --- Fim da [MELHORIA 4 - RPD] ---
+
+            // --- Funções do Formulário de Prontuário ---
+
+            function carregarProntuario() {
+                const nome = selectPaciente.value;
+                if (nome) {
+                    nomePacienteTitulo.textContent = `Prontuário de: ${nome}`;
+                    prontuarioContainer.style.display = 'block';
+                    infoCriticaHeader.style.display = 'grid';
+                    
+                    limparFormularioSessao();
+                    carregarPerfil(nome);
+                    carregarPlanoDeAcaoAnterior(nome);
+                    carregarConceitualizacao(nome); 
+                    carregarHistorico(nome); 
+                    carregarHeaderCritico(nome);
+                    
+                    // [MELHORIA 4 - RPD] Carrega RPDs e reseta form
+                    carregarRPDs(nome);
+                    toggleRPDForm(false); 
+                    // --- Fim da [MELHORIA 4 - RPD] ---
+
+                    // Reseta para a primeira aba (Sessão)
+                    mostrarTab('sessao', document.querySelector('#prontuario-container .tab-link[data-tab="sessao"]'));
+
+                } else {
+                    prontuarioContainer.style.display = 'none';
+                    infoCriticaHeader.style.display = 'none';
+                }
+            }
+            
+            function carregarHeaderCritico(nome) {
+                const perfil = getPerfilPaciente(nome);
+                const conceito = getConceitualizacaoPaciente(nome);
+
+                const risco = perfil['risk-assessment'] || 'Não avaliado';
+                let hipoteses = conceito.hipoteses || 'Não preenchido';
+                if (hipoteses.length > 100) {
+                    hipoteses = hipoteses.substring(0, 100) + '...';
+                }
+                const emergencia = perfil['contato-emergencia'] || 'Não preenchido';
+                
+                document.getElementById('info-risco').textContent = risco;
+                document.getElementById('info-hipoteses').textContent = hipoteses;
+                document.getElementById('info-emergencia').textContent = emergencia;
+            }
+            
+            function carregarPerfil(nome) {
+                const perfil = getPerfilPaciente(nome);
+                const campos = document.querySelectorAll('#perfil-form textarea, #perfil-form input');
+                campos.forEach(campo => {
+                    const chave = campo.id.replace(/^perfil-/, ''); 
+                    campo.value = perfil[chave] || '';
+                });
+                calcularIdade(); 
+            }
+            
+            function salvarPerfil(notificar = true) {
+                const nome = selectPaciente.value;
+                if (!nome) return;
+
+                const perfil = {};
+                const campos = document.querySelectorAll('#perfil-form textarea, #perfil-form input');
+                campos.forEach(campo => {
+                    const chave = campo.id.replace(/^perfil-/, '');
+                    perfil[chave] = campo.value.trim();
+                });
+
+                dbSet(`perfil_${nome}`, perfil);
+                carregarHeaderCritico(nome);
+                
+                if (notificar) {
+                    showToast('Perfil salvo com sucesso!', 'success');
+                }
+            }
+            
+            function calcularIdade() {
+                const dataNascInput = document.getElementById('perfil-data-nascimento');
+                if (!dataNascInput.value) {
+                    document.getElementById('perfil-idade').value = '';
+                    return;
+                };
+                
+                const dataNasc = new Date(dataNascInput.value);
+                const hoje = new Date();
+                let idade = hoje.getFullYear() - dataNasc.getFullYear();
+                const mes = hoje.getMonth() - dataNasc.getMonth();
+                if (mes < 0 || (mes === 0 && hoje.getDate() < dataNasc.getDate())) {
+                    idade--;
+                }
+                document.getElementById('perfil-idade').value = idade >= 0 ? idade : '';
+            }
+            
+            function carregarConceitualizacao(nome) {
+                const conceito = getConceitualizacaoPaciente(nome);
+                const campos = document.querySelectorAll('#conceitualizacao-form textarea, #conceitualizacao-form input');
+                campos.forEach(campo => {
+                    const chave = campo.id.replace(/^(conceito-|diag-)/, '');
+                    campo.value = conceito[chave] || '';
+                });
+            }
+            
+            function salvarConceitualizacao() {
+                const nome = selectPaciente.value;
+                if (!nome) return;
+
+                const conceito = {};
+                const campos = document.querySelectorAll('#conceitualizacao-form textarea, #conceitualizacao-form input');
+                campos.forEach(campo => {
+                    const chave = campo.id.replace(/^(conceito-|diag-)/, '');
+                    conceito[chave] = campo.value.trim();
+                });
+
+                dbSet(`conceitualizacao_${nome}`, conceito);
+                carregarHeaderCritico(nome);
+                showToast('Conceitualização salva!', 'success');
+            }
+
+            function carregarPlanoDeAcaoAnterior(nome) {
+                const historico = getHistoricoPaciente(nome);
+                if (historico.length > 0) {
+                    const ultimaSessao = historico[0];
+                    planoAnteriorDisplay.textContent = ultimaSessao.planoAcao || '(Nenhum plano de ação definido na sessão anterior.)';
+                    planoAnteriorStatus.value = 'Não Realizado'; 
+                } else {
+                    planoAnteriorDisplay.textContent = '(Nenhuma sessão anterior encontrada.)';
+                    planoAnteriorStatus.value = 'N/A';
+                }
+            }
+
+            function limparFormularioSessao() {
+                prontuarioForm.reset();
+                dataSessaoInput.valueAsDate = new Date();
+                humorSelecionadoInput.value = '';
+                humorDescricao.textContent = '';
+                
+                document.getElementById('sessao-risk-level').value = '';
+                document.getElementById('sessao-risk-notes').value = '';
+                
+                document.querySelectorAll('.humor-emoji.selecionado').forEach(el => {
+                    el.classList.remove('selecionado');
+                });
+                
+                planoAnteriorDisplay.textContent = '(Selecione um paciente para carregar)';
+                planoAnteriorStatus.value = 'N/A';
+            }
+
+            function selecionarHumor(humor, elementoClicado) {
+                document.querySelectorAll('.humor-emoji').forEach(el => {
+                    el.classList.remove('selecionado');
+                });
+
+                elementoClicado.classList.add('selecionado');
+                humorSelecionadoInput.value = humor;
+                humorDescricao.textContent = humor;
+            }
+
+            function salvarSessao() {
+                const nome = selectPaciente.value;
+                if (!nome) return;
+
+                const sessao = getSessaoAtualDoForm();
+                if (!sessao) return; 
+
+                const historico = getHistoricoPaciente(nome);
+                historico.push(sessao);
+                
+                historico.sort((a, b) => new Date(b.data) - new Date(a.data)); 
+                
+                dbSet(`prontuario_${nome}`, historico);
+
+                showToast('Sessão salva com sucesso!', 'success');
+                limparFormularioSessao();
+                carregarPlanoDeAcaoAnterior(nome);
+                carregarHistorico(nome);
+            }
+
+            function getSessaoAtualDoForm() {
+                if (!dataSessaoInput.value) {
+                    showToast('Por favor, preencha a Data da Sessão.', 'error');
+                    return null;
+                }
+                if (!humorSelecionadoInput.value) {
+                     showToast('Por favor, selecione a Avaliação de Humor.', 'error');
+                    return null;
+                }
+
+                return {
+                    data: dataSessaoInput.value,
+                    humor: humorSelecionadoInput.value,
+                    riscoNivel: document.getElementById('sessao-risk-level').value || '0',
+                    riscoNotas: document.getElementById('sessao-risk-notes').value.trim(),
+                    acontecimentos: document.getElementById('acontecimentos').value.trim(),
+                    habilidades: document.getElementById('habilidades').value.trim(),
+                    planoAnteriorStatus: planoAnteriorStatus.value,
+                    planoAcao: document.getElementById('plano-acao').value.trim(),
+                    feedback: document.getElementById('feedback').value.trim(),
+                    id: Date.now().toString()
+                };
+            }
+
+            // --- [MELHORIA 4 - RPD] Funções do Módulo RPD ---
+
+            function toggleRPDForm(show, rpdData = null) {
+                limparFormularioRPD();
+                if (show) {
+                    rpdDataInput.valueAsDate = new Date(); // Padrão para hoje
+                    
+                    // Se estamos editando, preencha os dados
+                    if (rpdData) {
+                        rpdFormTitulo.textContent = "Editar Registro de Pensamento";
+                        rpdEditIdInput.value = rpdData.id;
+                        rpdDataInput.value = rpdData.data;
+                        document.getElementById('rpd-situacao').value = rpdData.situacao;
+                        document.getElementById('rpd-pensamentoAutomatico').value = rpdData.pensamentoAutomatico;
+                        document.getElementById('rpd-emocao').value = rpdData.emocao;
+                        document.getElementById('rpd-evidenciasApoiam').value = rpdData.evidenciasApoiam;
+                        document.getElementById('rpd-evidenciasContra').value = rpdData.evidenciasContra;
+                        document.getElementById('rpd-pensamentoAlternativo').value = rpdData.pensamentoAlternativo;
+                        document.getElementById('rpd-resultadoHumor').value = rpdData.resultadoHumor;
+                    } else {
+                        rpdFormTitulo.textContent = "Novo Registro de Pensamento";
+                    }
+                    rpdFormContainer.style.display = 'block';
+                } else {
+                    rpdFormContainer.style.display = 'none';
+                }
+            }
+
+            function limparFormularioRPD() {
+                rpdForm.reset();
+                rpdEditIdInput.value = '';
+            }
+
+            function carregarRPDs(nome) {
+                const rpdHistorico = getRPDsPaciente(nome);
+                // Ordena por data, mais recente primeiro
+                rpdHistorico.sort((a, b) => new Date(b.data) - new Date(a.data));
+                renderizarRPDs(rpdHistorico);
+            }
+            
+            function renderizarRPDs(rpdArray) {
+                const listaVazia = document.getElementById('rpd-lista-vazia');
+                rpdLista.innerHTML = '';
+                
+                if (rpdArray.length === 0) {
+                    rpdLista.appendChild(listaVazia);
+                    listaVazia.style.display = 'block';
+                } else {
+                    listaVazia.style.display = 'none';
+                    rpdArray.forEach(rpd => {
+                        const li = document.createElement('li');
+                        li.className = 'rpd-item';
+                        li.dataset.id = rpd.id;
+                        
+                        // Limita o pensamento automático para exibição
+                        let paCurto = rpd.pensamentoAutomatico || '(Pensamento não registrado)';
+                        if (paCurto.length > 100) {
+                            paCurto = paCurto.substring(0, 100) + '...';
+                        }
+
+                        li.innerHTML = `
+                            <div class="rpd-item-info">
+                                <strong>${formatarData(rpd.data)}: ${rpd.situacao || '(Situação não registrada)'}</strong>
+                                <span>${paCurto}</span>
+                            </div>
+                            <div class="rpd-item-botoes">
+                                <button class="btn-link-editar rpd-btn-editar" data-id="${rpd.id}">Editar</button>
+                                <button class="btn-link-perigo rpd-btn-deletar" data-id="${rpd.id}">Remover</button>
+                            </div>
+                        `;
+                        rpdLista.appendChild(li);
+                    });
+                }
+            }
+
+            function salvarRPD() {
+                const nome = selectPaciente.value;
+                if (!nome) return;
+
+                if (!rpdDataInput.value) {
+                    showToast('Por favor, preencha a Data do Acontecimento.', 'error');
+                    return;
+                }
+
+                const rpdHistorico = getRPDsPaciente(nome);
+                const editId = rpdEditIdInput.value;
+                
+                const rpdData = {
+                    data: rpdDataInput.value,
+                    situacao: document.getElementById('rpd-situacao').value.trim(),
+                    pensamentoAutomatico: document.getElementById('rpd-pensamentoAutomatico').value.trim(),
+                    emocao: document.getElementById('rpd-emocao').value.trim(),
+                    evidenciasApoiam: document.getElementById('rpd-evidenciasApoiam').value.trim(),
+                    evidenciasContra: document.getElementById('rpd-evidenciasContra').value.trim(),
+                    pensamentoAlternativo: document.getElementById('rpd-pensamentoAlternativo').value.trim(),
+                    resultadoHumor: document.getElementById('rpd-resultadoHumor').value.trim()
+                };
+
+                if (editId) {
+                    // Editando
+                    const index = rpdHistorico.findIndex(rpd => rpd.id === editId);
+                    if (index > -1) {
+                        rpdHistorico[index] = { ...rpdHistorico[index], ...rpdData };
+                    }
+                    showToast('RPD atualizado com sucesso!', 'success');
+                } else {
+                    // Novo
+                    rpdData.id = Date.now().toString();
+                    rpdHistorico.push(rpdData);
+                    showToast('RPD salvo com sucesso!', 'success');
+                }
+
+                dbSet(`rpd_${nome}`, rpdHistorico);
+                carregarRPDs(nome); // Recarrega a lista
+                toggleRPDForm(false); // Esconde o formulário
+            }
+            
+            function carregarRPDParaEdicao(rpdId) {
+                const nome = selectPaciente.value;
+                if (!nome) return;
+                
+                const rpdHistorico = getRPDsPaciente(nome);
+                const rpdData = rpdHistorico.find(rpd => rpd.id === rpdId);
+                
+                if (rpdData) {
+                    toggleRPDForm(true, rpdData);
+                    window.scrollTo(0, rpdFormContainer.offsetTop - 20); // Rola para o formulário
+                } else {
+                    showToast('Não foi possível encontrar o RPD.', 'error');
+                }
+            }
+            
+            function deletarRPD(rpdId) {
+                const nome = selectPaciente.value;
+                if (!nome) return;
+
+                if (!confirm("Tem certeza que deseja remover este RPD?")) {
+                    return;
+                }
+
+                let rpdHistorico = getRPDsPaciente(nome);
+                rpdHistorico = rpdHistorico.filter(rpd => rpd.id !== rpdId);
+                
+                dbSet(`rpd_${nome}`, rpdHistorico);
+                carregarRPDs(nome); // Recarrega a lista
+                showToast('RPD removido.', 'success');
+            }
+
+            // --- Fim da [MELHORIA 4 - RPD] ---
+            
+            // --- Funções do Histórico e Modal ---
+            
+            function carregarHistorico(nome) {
+                const historico = getHistoricoPaciente(nome);
+                renderizarHistorico(historico);
+                document.getElementById('input-busca-historico').value = '';
+            }
+            
+            function renderizarHistorico(listaHistorico) {
+                const listaVazia = document.getElementById('historico-lista-vazia');
+                historicoLista.innerHTML = '';
+                
+                if (listaHistorico.length === 0) {
+                    historicoLista.appendChild(listaVazia);
+                    listaVazia.style.display = 'block';
+                } else {
+                    listaVazia.style.display = 'none';
+                    listaHistorico.forEach(sessao => {
+                        const li = document.createElement('li');
+                        li.className = 'historico-item';
+                        li.dataset.id = sessao.id; 
+                        li.innerHTML = `
+                            <div class="historico-item-info">
+                                <strong>${formatarData(sessao.data)}</strong>
+                                <span>(Humor: ${sessao.humor || 'N/A'})</span>
+                            </div>
+                            <button class="btn-link historico-item-btn" data-id="${sessao.id}">Ver Detalhes</button>
+                        `;
+                        historicoLista.appendChild(li);
+                    });
+                }
+            }
+            
+            function filtrarHistorico(termo) {
+                const nome = selectPaciente.value;
+                if (!nome) return;
+                
+                const termoBusca = termo.toLowerCase().trim();
+                const historicoCompleto = getHistoricoPaciente(nome);
+                
+                if (!termoBusca) {
+                    renderizarHistorico(historicoCompleto);
+                    return;
+                }
+                
+                const historicoFiltrado = historicoCompleto.filter(sessao => {
+                    const textoSessao = [
+                        sessao.acontecimentos,
+                        sessao.habilidades,
+                        sessao.planoAcao,
+                        sessao.feedback,
+                        sessao.humor,
+                        sessao.planoAnteriorStatus,
+                        sessao.riscoNotas
+                    ].join(' ').toLowerCase();
+                    
+                    return textoSessao.includes(termoBusca);
+                });
+                
+                renderizarHistorico(historicoFiltrado);
+            }
+            
+            function abrirModalSessao(sessaoId) {
+                const nome = selectPaciente.value;
+                if (!nome) return;
+                
+                const historico = getHistoricoPaciente(nome);
+                const sessao = historico.find(s => s.id === sessaoId);
+                
+                if (!sessao) {
+                    showToast('Não foi possível encontrar a sessão.', 'error');
+                    return;
+                }
+                
+                document.getElementById('modal-titulo').textContent = `Sessão de ${formatarData(sessao.data)}`;
+                document.getElementById('modal-humor').textContent = sessao.humor;
+                
+                const riscoNivelNum = parseInt(sessao.riscoNivel || '0', 10);
+                const riscoLabel = `Nível ${riscoNivelNum}/5`;
+                const riscoNotas = sessao.riscoNotas || '(Sem notas)';
+                document.getElementById('modal-risco').textContent = `${riscoLabel}\n${riscoNotas}`;
+
+                document.getElementById('modal-acontecimentos').textContent = sessao.acontecimentos;
+                document.getElementById('modal-habilidades').textContent = sessao.habilidades;
+                document.getElementById('modal-plano-anterior-status').textContent = sessao.planoAnteriorStatus;
+                document.getElementById('modal-plano-acao').textContent = sessao.planoAcao;
+                document.getElementById('modal-feedback').textContent = sessao.feedback;
+                
+                modalBackdrop.classList.add('show');
+            }
+            
+            function carregarGraficosProgresso(nome) {
+                const historico = getHistoricoPaciente(nome);
+                if (historico.length < 2) {
+                     if (moodChartInstance) {
+                        moodChartInstance.destroy();
+                        moodChartInstance = null;
+                    }
+                     const canvas = document.getElementById('moodChart');
+                     const ctx = canvas.getContext('2d');
+                     ctx.clearRect(0, 0, canvas.width, canvas.height);
+                     ctx.font = "16px Arial";
+                     ctx.fillStyle = "#888";
+                     ctx.textAlign = "center";
+                     ctx.fillText("É necessário ter pelo menos 2 sessões registradas para exibir o gráfico.", canvas.width / 2, canvas.height / 2);
+                    return;
+                }
+                
+                const humorMap = {
+                    "Muito Ruim": 1,
+                    "Ruim": 2,
+                    "Neutro": 3,
+                    "Bom": 4,
+                    "Muito Bom": 5
+                };
+                
+                const historicoCronologico = [...historico].reverse();
+                
+                const labels = historicoCronologico.map(s => formatarData(s.data));
+                const humorDataPoints = historicoCronologico.map(s => humorMap[s.humor] || null);
+                const riscoDataPoints = historicoCronologico.map(s => s.riscoNivel ? parseInt(s.riscoNivel, 10) : null);
+                
+                const ctx = document.getElementById('moodChart').getContext('2d');
+                
+                if (moodChartInstance) {
+                    moodChartInstance.destroy();
+                }
+                
+                moodChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Evolução do Humor',
+                            data: humorDataPoints,
+                            borderColor: 'rgba(0, 90, 156, 1)',
+                            backgroundColor: 'rgba(0, 90, 156, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            fill: true,
+                            spanGaps: true,
+                            yAxisID: 'yHumor'
+                        },
+                        {
+                            label: 'Nível de Risco (0-5)',
+                            data: riscoDataPoints,
+                            borderColor: 'rgba(220, 53, 69, 1)',
+                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.1,
+                            fill: false,
+                            spanGaps: true,
+                            yAxisID: 'yRisco'
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            yHumor: {
+                                type: 'linear',
+                                position: 'left',
+                                beginAtZero: false,
+                                min: 1,
+                                max: 5,
+                                title: {
+                                    display: true,
+                                    text: 'Humor'
+                                },
+                                ticks: {
+                                    stepSize: 1,
+                                    callback: function(value) {
+                                        const map = ["", "Muito Ruim", "Ruim", "Neutro", "Bom", "Muito Bom"];
+                                        return map[value];
+                                    }
+                                }
+                            },
+                            yRisco: {
+                                type: 'linear',
+                                position: 'right',
+                                beginAtZero: true,
+                                min: 0,
+                                max: 5,
+                                title: {
+                                    display: true,
+                                    text: 'Risco'
+                                },
+                                ticks: {
+                                    stepSize: 1
+                                },
+                                grid: {
+                                    drawOnChartArea: false,
+                                }
+                            }
+                        },
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                    }
+                });
+            }
+            
+
+            // --- Funções de Exportação (TXT) ---
+
+            function formatarData(dataISO) {
+                if (!dataISO) return 'Data não definida';
+                // Verifica se já está no formato dd/mm/aaaa
+                if (String(dataISO).includes('/') && dataISO.length === 10) return dataISO;
+                
+                let dataObj = new Date(dataISO);
+                // Corrige bug do fuso horário na conversão de 'aaaa-mm-dd'
+                if (String(dataISO).includes('-') && dataISO.length === 10) {
+                     const parts = dataISO.split('-');
+                     dataObj = new Date(parts[0], parts[1] - 1, parts[2]);
+                }
+                
+                if (isNaN(dataObj.getTime())) {
+                   return dataISO; // Retorna o original se for inválido
+                }
+
+                const dia = String(dataObj.getDate()).padStart(2, '0'); // Usa getDate() para fuso local
+                const mes = String(dataObj.getMonth() + 1).padStart(2, '0'); 
+                const ano = dataObj.getFullYear();
+                
+                return `${dia}/${mes}/${ano}`;
+            }
+            
+            function formatarBlocoTexto(titulo, valor) {
+                return `${titulo}:\n${valor || '(Não preenchido)'}\n\n`;
+            }
+            
+            function formatarSessaoTXT(sessao) {
+                let bloco = `----------------------------------------\n`;
+                bloco += ` Sessão de: ${formatarData(sessao.data)}\n`;
+                bloco += `----------------------------------------\n\n`;
+                bloco += `1. AVALIAÇÃO DE HUMOR:\n`;
+                bloco += `   - ${sessao.humor}\n\n`;
+                
+                bloco += `2. AVALIAÇÃO DE RISCO:\n`;
+                bloco += `   - Nível: ${sessao.riscoNivel || '0'}/5\n`;
+                bloco += `   - Notas: ${sessao.riscoNotas || '(Sem notas)'}\n\n`;
+                
+                bloco += `3. ACONTECIMENTOS SEMANAIS:\n`;
+                bloco += `   ${sessao.acontecimentos || '(Nenhum registro)'}\n\n`;
+                bloco += `4. HABILIDADES E PAUTAS TRABALHADAS:\n`;
+                bloco += `   ${sessao.habilidades || '(Nenhum registro)'}\n\n`;
+                bloco += `5. STATUS DO PLANO DE AÇÃO ANTERIOR:\n`;
+                bloco += `   - ${sessao.planoAnteriorStatus || '(N/A)'}\n\n`;
+                bloco += `6. PLANO DE AÇÃO (Para esta semana):\n`;
+                bloco += `   ${sessao.planoAcao || '(Nenhum registro)'}\n\n`;
+                bloco += `7. FEEDBACK DA SESSÃO:\n`;
+                bloco += `   ${sessao.feedback || '(Nenhum registro)'}\n\n\n`;
+                return bloco;
+            }
+            
+            // [MELHORIA 4 - RPD] Nova função para formatar RPD para TXT
+            function formatarRPDTXT(rpd, index) {
+                let bloco = `----------------------------------------\n`;
+                bloco += ` RPD #${index + 1} - Data: ${formatarData(rpd.data)}\n`;
+                bloco += `----------------------------------------\n\n`;
+                bloco += formatarBlocoTexto('SITUAÇÃO', rpd.situacao);
+                bloco += formatarBlocoTexto('PENSAMENTO(S) AUTOMÁTICO(S)', rpd.pensamentoAutomatico);
+                bloco += formatarBlocoTexto('EMOÇÃO(ÕES)', rpd.emocao);
+                bloco += formatarBlocoTexto('EVIDÊNCIAS QUE APOIAM O PA', rpd.evidenciasApoiam);
+                bloco += formatarBlocoTexto('EVIDÊNCIAS CONTRA O PA', rpd.evidenciasContra);
+                bloco += formatarBlocoTexto('PENSAMENTO ALTERNATIVO', rpd.pensamentoAlternativo);
+                bloco += formatarBlocoTexto('RESULTADO (NOVO HUMOR)', rpd.resultadoHumor);
+                bloco += `\n`;
+                return bloco;
+            }
+            // --- Fim da [MELHORIA 4 - RPD] ---
+
+            function dispararDownload(conteudo, nomeArquivo, tipoMIME = 'text/plain;charset=utf-8') {
+                const blob = new Blob([conteudo], { type: tipoMIME });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = nomeArquivo;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            function baixarHistoricoTXT() {
+                const nome = selectPaciente.value;
+                if (!nome) {
+                    showToast('Selecione um paciente.', 'error');
+                    return;
+                }
+
+                const historico = getHistoricoPaciente(nome);
+                const perfil = getPerfilPaciente(nome);
+                const conceito = getConceitualizacaoPaciente(nome);
+                const rpdHistorico = getRPDsPaciente(nome); // [MELHORIA 4 - RPD] Pega RPDs
+
+                if (historico.length === 0 && Object.keys(perfil).length === 0 && Object.keys(conceito).length === 0 && rpdHistorico.length === 0) {
+                    showToast('Este paciente não possui dados salvos.', 'error');
+                    return;
+                }
+
+                let conteudoTXT = `HISTÓRICO DE PRONTUÁRIO\n`;
+                conteudoTXT += `================================\n`;
+                conteudoTXT += `Paciente: ${nome}\n`;
+                conteudoTXT += `Data de Exportação: ${new Date().toLocaleDateString('pt-BR')}\n`;
+                conteudoTXT += `Total de Sessões: ${historico.length}\n`;
+                conteudoTXT += `Total de RPDs: ${rpdHistorico.length}\n`; // [MELHORIA 4 - RPD]
+                conteudoTXT += `================================\n\n`;
+                
+                if (Object.keys(perfil).length > 0) {
+                    conteudoTXT += `================================\n`;
+                    conteudoTXT += ` PERFIL DO PACIENTE\n`;
+                    conteudoTXT += `================================\n\n`;
+                    
+                    conteudoTXT += `--- AVALIAÇÃO DE RISCO (GERAL) ---\n`;
+                    conteudoTXT += formatarBlocoTexto('RISCO (Ideação, Plano, etc.)', perfil['risk-assessment']);
+                    conteudoTXT += `\n`;
+                    
+                    conteudoTXT += `--- DADOS SOCIODEMOGRÁFICOS ---\n`;
+                    conteudoTXT += formatarBlocoTexto('Nome completo', perfil['nome-completo']);
+                    conteudoTXT += `Data de Nascimento: ${formatarData(perfil['data-nascimento'])}\n\n`;
+                    conteudoTXT += formatarBlocoTexto('Idade', perfil.idade);
+                    conteudoTXT += formatarBlocoTexto('Telefone', perfil.telefone);
+                    conteudoTXT += formatarBlocoTexto('Endereço', perfil.endereco);
+                    conteudoTXT += formatarBlocoTexto('Gênero', perfil.genero);
+                    conteudoTXT += formatarBlocoTexto('Estado civil', perfil['estado-civil']);
+                    conteudoTXT += formatarBlocoTexto('Raça/cor', perfil['raca-cor']);
+                    conteudoTXT += formatarBlocoTexto('Ocupação', perfil.ocupacao);
+                    conteudoTXT += formatarBlocoTexto('Religião', perfil.religiao);
+                    conteudoTXT += formatarBlocoTexto('Renda', perfil.renda);
+                    conteudoTXT += formatarBlocoTexto('Possui filhos(as)?', perfil.filhos);
+                    conteudoTXT += formatarBlocoTexto('Contato de Emergência', perfil['contato-emergencia']);
+                    conteudoTXT += `\n`;
+                    conteudoTXT += `--- ANAMNESE ---\n`;
+                    conteudoTXT += formatarBlocoTexto('Queixa principal', perfil['queixa-principal']);
+                    conteudoTXT += formatarBlocoTexto('Quem te indicou?', perfil.indicacao);
+                    conteudoTXT += formatarBlocoTexto('Expectativas', perfil.expectativas);
+                    conteudoTXT += formatarBlocoTexto('Por que agora?', perfil['porque-agora']);
+                    conteudoTXT += formatarBlocoTexto('Outros sintomas', perfil['outros-sintomas']);
+                    conteudoTXT += formatarBlocoTexto('Sintomas passados', perfil['sintomas-passados']);
+                    conteudoTXT += formatarBlocoTexto('Estratégias de enfrentamento', perfil.estrategias);
+                    conteudoTXT += formatarBlocoTexto('Interferência no cotidiano', perfil.interferencia);
+                    conteudoTXT += formatarBlocoTexto('A “teoria” do paciente', perfil['teoria-paciente']);
+                    conteudoTXT += formatarBlocoTexto('Contexto social (complementar)', perfil['contexto-social']);
+                    conteudoTXT += formatarBlocoTexto('História de vida', perfil['historia-vida']);
+                    conteudoTXT += formatarBlocoTexto('História familiar', perfil['historia-familiar']);
+                    conteudoTXT += formatarBlocoTexto('Aspectos culturais', perfil['aspectos-culturais']);
+                    conteudoTXT += formatarBlocoTexto('Escola e educação', perfil['escola-educacao']);
+                    conteudoTXT += formatarBlocoTexto('Relação com trabalho', perfil['relacao-trabalho']);
+                    conteudoTXT += formatarBlocoTexto('Relacionamentos passados', perfil['relacionamentos-passados']);
+                    conteudoTXT += formatarBlocoTexto('Dificuldades psicológicas passadas', perfil['dificuldades-passadas']);
+                    conteudoTXT += formatarBlocoTexto('Acontecimentos traumáticos', perfil['acontecimentos-traumaticos']);
+                    conteudoTXT += `\n--- ASPECTOS EXTRAS ---\n`;
+                    conteudoTXT += formatarBlocoTexto('Tratamentos medicamentosos', perfil['tratamentos-medicamentosos']);
+                    conteudoTXT += formatarBlocoTexto('Tratamentos psicológicos prévios', perfil['tratamentos-psicologicos']);
+                    conteudoTXT += formatarBlocoTexto('Abuso de substâncias', perfil['abuso-substancias']);
+                    conteudoTXT += formatarBlocoTexto('Resistência à psicofarmacologia', perfil['resistencia-psicofarmacologia']);
+                    conteudoTXT += formatarBlocoTexto('Rotina', perfil.rotina);
+                    conteudoTXT += `\n`;
+                }
+                
+                if (Object.keys(conceito).length > 0) {
+                    conteudoTXT += `================================\n`;
+                    conteudoTXT += ` CONCEITUALIZAÇÃO DE CASO\n`;
+                    conteudoTXT += `================================\n\n`;
+                    conteudoTXT += `--- 1. Dados Gerais ---\n`;
+                    conteudoTXT += `Iniciais: ${conceito.iniciais || ''}\n`;
+                    conteudoTXT += `Início Atendimentos: ${formatarData(conceito['inicio-atend'])}\n`;
+                    conteudoTXT += `Sexo: ${conceito.sexo || ''}\n`;
+                    conteudoTXT += `Idade: ${conceito.idade || ''}\n`;
+                    conteudoTXT += `Escolaridade: ${conceito.escolaridade || ''}\n`;
+                    conteudoTXT += `Profissão: ${conceito.profissao || ''}\n`;
+                    conteudoTXT += formatarBlocoTexto('Outros profissionais', conceito['outros-profs']);
+                    conteudoTXT += `--- 2. Genetograma ---\n`;
+                    conteudoTXT += formatarBlocoTexto('Descrição', conceito.genetograma);
+                    conteudoTXT += `--- 3. Hipóteses Diagnósticas ---\n`;
+                    conteudoTXT += formatarBlocoTexto('Hipóteses', conceito.hipoteses);
+                    conteudoTXT += `--- 4. Medicação / Drogas ---\n`;
+                    conteudoTXT += formatarBlocoTexto('Med. Psiquiátricas atuais', conceito['med-psi-atual']);
+                    conteudoTXT += formatarBlocoTexto('Med. Psiquiátricas anterior', conceito['med-psi-ant']);
+                    conteudoTXT += formatarBlocoTexto('Outras Med. atuais', conceito['med-outras-atual']);
+                    conteudoTXT += formatarBlocoTexto('Outras Med. anterior', conceito['med-outras-ant']);
+                    conteudoTXT += formatarBlocoTexto('Entorpecentes atual', conceito['drogas-atual']);
+                    conteudoTXT += formatarBlocoTexto('Entorpecentes anterior', conceito['drogas-ant']);
+                    conteudoTXT += `--- 5. Motivo da busca ---\n`;
+                    conteudoTXT += formatarBlocoTexto('Motivo', conceito['motivo-busca']);
+                    conteudoTXT += `--- 6. Diagrama de Conceitualização ---\n`;
+                    conteudoTXT += formatarBlocoTexto('Dados relevantes da infância', conceito['dados-infancia']);
+                    conteudoTXT += formatarBlocoTexto('Crenças centrais', conceito['crencas-centrais']);
+                    conteudoTXT += formatarBlocoTexto('Crenças intermediárias', conceito['crencas-intermediarias']);
+                    conteudoTXT += formatarBlocoTexto('Estratégias compensatórias', conceito.estrategias);
+                    conteudoTXT += `\n... Situação 1 ...\n`;
+                    conteudoTXT += formatarBlocoTexto('Situação', conceito['sit1-situacao']);
+                    conteudoTXT += formatarBlocoTexto('Pensamento automático', conceito['sit1-pa']);
+                    conteudoTXT += formatarBlocoTexto('Significado do PA', conceito['sit1-significado']);
+                    conteudoTXT += formatarBlocoTexto('Emoção', conceito['sit1-emocao']);
+                    conteudoTXT += formatarBlocoTexto('Comportamento', conceito['sit1-comportamento']);
+                    conteudoTXT += `\n... Situação 2 ...\n`;
+                    conteudoTXT += formatarBlocoTexto('Situação', conceito['sit2-situacao']);
+                    conteudoTXT += formatarBlocoTexto('Pensamento automático', conceito['sit2-pa']);
+                    conteudoTXT += formatarBlocoTexto('Significado do PA', conceito['sit2-significado']);
+                    conteudoTXT += formatarBlocoTexto('Emoção', conceito['sit2-emocao']);
+                    conteudoTXT += formatarBlocoTexto('Comportamento', conceito['sit2-comportamento']);
+                    conteudoTXT += `--- 7. Focos do tratamento ---\n`;
+                    conteudoTXT += formatarBlocoTexto('Focos', conceito.focos);
+                    conteudoTXT += `--- 8. Plano de tratamento ---\n`;
+                    conteudoTXT += formatarBlocoTexto('Plano (técnicas)', conceito.plano);
+                    conteudoTXT += `--- Dúvidas do Supervisionando ---\n`;
+                    conteudoTXT += formatarBlocoTexto('Diagnóstico', conceito['duvida-diag']);
+                    conteudoTXT += formatarBlocoTexto('Medicação', conceito['duvida-med']);
+                    conteudoTXT += formatarBlocoTexto('Conceitualização', conceito['duvida-conc']);
+                    conteudoTXT += formatarBlocoTexto('Focos', conceito['duvida-focos']);
+                    conteudoTXT += formatarBlocoTexto('Técnicas/Manejo', conceito['duvida-tec']);
+                    conteudoTXT += formatarBlocoTexto('Outras', conceito['duvida-outras']);
+                    conteudoTXT += `\n`;
+                }
+
+                if (historico.length > 0) {
+                    conteudoTXT += `================================\n`;
+                    conteudoTXT += ` HISTÓRICO DE SESSÕES\n`;
+                    conteudoTXT += `================================\n\n`;
+                    historico.forEach(sessao => {
+                        conteudoTXT += formatarSessaoTXT(sessao);
+                    });
+                }
+                
+                // [MELHORIA 4 - RPD] Adiciona RPDs ao TXT
+                if (rpdHistorico.length > 0) {
+                    conteudoTXT += `================================\n`;
+                    conteudoTXT += ` REGISTROS DE PENSAMENTOS (RPDs)\n`;
+                    conteudoTXT += `================================\n\n`;
+                    // Ordena por data (mais antigo primeiro) para o TXT
+                    const rpdOrdenado = [...rpdHistorico].sort((a, b) => new Date(a.data) - new Date(b.data));
+                    rpdOrdenado.forEach((rpd, index) => {
+                        conteudoTXT += formatarRPDTXT(rpd, index);
+                    });
+                }
+                // --- Fim da [MELHORIA 4 - RPD] ---
+
+                const dataHoje = new Date().toISOString().split('T')[0];
+                const nomeArquivo = `Historico_Completo_${nome.replace(/\s+/g, '_')}_${dataHoje}.txt`;
+                dispararDownload(conteudoTXT, nomeArquivo);
+            }
+
+            function baixarSessaoAtualTXT() {
+                const nome = selectPaciente.value;
+                if (!nome) {
+                    showToast('Selecione um paciente.', 'error');
+                    return;
+                }
+
+                const sessao = getSessaoAtualDoForm();
+                if (!sessao) {
+                    return; 
+                }
+
+                let conteudoTXT = `REGISTRO DE SESSÃO INDIVIDUAL\n`;
+                conteudoTXT += `================================\n`;
+                conteudoTXT += `Paciente: ${nome}\n`;
+                conteudoTXT += `Data da Sessão: ${formatarData(sessao.data)}\n`;
+                conteudoTXT += `================================\n\n`;
+
+                conteudoTXT += formatarSessaoTXT(sessao);
+
+                const nomeArquivo = `Sessao_${nome.replace(/\s+/g, '_')}_${sessao.data}.txt`;
+                dispararDownload(conteudoTXT, nomeArquivo);
+            }
+            
+            // --- Funções de Backup (JSON) com Criptografia ---
+            
+            function exportarBackup() {
+                if (!confirm("Isso exportará TODOS os dados descriptografados de TODOS os pacientes em um único arquivo JSON. Deseja continuar?")) {
+                    return;
+                }
+                
+                const backupData = {};
+                const pacientes = getPacientesDB(); 
+                
+                if (pacientes.length === 0) {
+                    showToast("Nenhum paciente para exportar.", "error");
+                    return;
+                }
+                
+                backupData['pacientesLista'] = pacientes;
+                
+                pacientes.forEach(nome => {
+                    backupData[`prontuario_${nome}`] = getHistoricoPaciente(nome);
+                    backupData[`perfil_${nome}`] = getPerfilPaciente(nome);
+                    backupData[`conceitualizacao_${nome}`] = getConceitualizacaoPaciente(nome);
+                    backupData[`rpd_${nome}`] = getRPDsPaciente(nome); // [MELHORIA 4 - RPD] Adiciona RPDs ao backup
+                });
+                
+                // [MUDANÇA V2.7] Adiciona a agenda ao backup
+                backupData['agendaPlanner'] = dbGet('agendaPlanner', {});
+                
+                const dataStr = JSON.stringify(backupData, null, 2);
+                const dataHoje = new Date().toISOString().split('T')[0];
+                const nomeArquivo = `Backup_Prontuarios_Descriptografado_${dataHoje}.json`;
+                
+                dispararDownload(dataStr, nomeArquivo, 'application/json');
+                showToast('Backup (JSON) exportado com sucesso!', 'success');
+            }
+            
+            function importarBackup(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                if (!confirm("Isso substituirá TODOS os dados atuais pelos dados do arquivo de backup. Esta ação NÃO PODE ser desfeita. Os dados importados serão CRIPTOGRAFADOS com a sua Senha Mestra atual. Deseja continuar?")) {
+                    event.target.value = null; 
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const backupData = JSON.parse(e.target.result);
+                        
+                        localStorage.clear();
+                        
+                        // A importação genérica já contempla `rpd_` e `agendaPlanner`
+                        for (const key in backupData) {
+                            if (Object.hasOwnProperty.call(backupData, key)) {
+                                dbSet(key, backupData[key]);
+                            }
+                        }
+                        
+                        showToast('Backup importado e criptografado! A página será recarregada.', 'success');
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2000);
+                        
+                    } catch (error) {
+                        showToast('Erro ao ler o arquivo de backup. É um JSON válido?', 'error');
+                        console.error("Erro ao importar:", error);
+                    } finally {
+                        event.target.value = null; 
+                    }
+                };
+                reader.readText(file);
+            }
+            
+            
+            // --- [REESCRITO V2.7] Funções da Agenda Integrada ---
+            
+            /**
+             * Gera a ESTRUTURA HTML (esqueleto) da tabela da agenda.
+             * O conteúdo (slots) é preenchido por `carregarAgenda`.
+             */
+            function gerarTabelaAgenda() {
+                const container = document.getElementById('agenda-view-container');
+                const dias = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+                const diasDisplay = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+                const horarios = [
+                    '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
+                    '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
+                    '19:00', '20:00'
+                ];
+
+                let tableHTML = '<h3>Agenda Semanal (Planner)</h3>';
+                tableHTML += '<table id="agenda-table">';
+                
+                // Cabeçalho
+                tableHTML += '<thead><tr><th class="col-horario">Horário</th>';
+                diasDisplay.forEach(dia => {
+                    tableHTML += `<th>${dia}</th>`;
+                });
+                tableHTML += '</tr></thead>';
+                
+                // Corpo
+                tableHTML += '<tbody>';
+                horarios.forEach(hora => {
+                    tableHTML += '<tr>';
+                    tableHTML += `<td class="col-horario">${hora}</td>`; // Célula do horário
+                    const horaKey = hora.replace(':', ''); // '0700'
+                    
+                    dias.forEach(diaKey => { // 'seg'
+                        const cellId = `${diaKey}-${horaKey}`; // 'seg-0700'
+                        // [MUDANÇA V2.7] A célula agora é um container com data-id
+                        tableHTML += `<td class="agenda-cell" data-id="${cellId}">
+                                        <!-- O conteúdo será renderizado pelo JS via renderizarSlot() -->
+                                    </td>`;
+                    });
+                    tableHTML += '</tr>';
+                });
+                tableHTML += '</tbody></table>';
+                
+                // Botão Salvar
+                tableHTML += `
+                    <div class="botoes-acao" style="margin-top: 20px;">
+                        <button type="button" id="btn-salvar-agenda" class="btn-primario">Salvar Alterações na Agenda</button>
+                    </div>
+                `;
+                
+                container.innerHTML = tableHTML;
+            }
+
+            /**
+             * [NOVO V2.7] Renderiza o conteúdo de um único slot da agenda.
+             * Pode ser um textarea (padrão) ou um bloco de paciente.
+             * @param {HTMLElement} cell - O elemento <td> (agenda-cell).
+             * @param {Object | null} slotData - Os dados do slot (ex: {type: 'patient', ...}).
+             */
+            function renderizarSlot(cell, slotData) {
+                const id = cell.dataset.id;
+                let contentHTML = '';
+                
+                if (slotData && slotData.type === 'patient') {
+                    // Interface de Paciente
+                    contentHTML = `
+                        <div class="agenda-slot-content">
+                            <div class="agenda-patient-block">
+                                <a href="#" class="agenda-patient-link" data-patient-id="${slotData.id}">${slotData.content}</a>
+                            </div>
+                        </div>
+                        <div class="agenda-slot-controls">
+                            <button type="button" class="btn-slot-control btn-terciario btn-remove-patient-slot" data-id="${id}">Remover</button>
+                        </div>
+                    `;
+                } else {
+                    // Interface de Texto (Padrão)
+                    const textContent = (slotData && slotData.content) ? slotData.content : '';
+                    contentHTML = `
+                        <div class="agenda-slot-content">
+                            <textarea class="agenda-slot" placeholder="..." data-id="${id}">${textContent}</textarea>
+                        </div>
+                        <div class="agenda-slot-controls">
+                            <button type="button" class="btn-slot-control btn-secundario btn-add-patient-slot" data-id="${id}">+ Paciente</button>
+                        </div>
+                    `;
+                }
+                cell.innerHTML = contentHTML;
+            }
+
+            /**
+             * [REESCRITO V2.7] Salva o estado da agenda lendo o DOM.
+             * Salva em um formato de objeto estruturado.
+             */
+            function salvarAgenda() {
+                const agendaData = {};
+                const cells = document.querySelectorAll('#agenda-table .agenda-cell');
+                
+                cells.forEach(cell => {
+                    const id = cell.dataset.id;
+                    const textSlot = cell.querySelector('.agenda-slot');
+                    const patientSlot = cell.querySelector('.agenda-patient-link');
+
+                    if (patientSlot) {
+                        // É um slot de paciente
+                        agendaData[id] = {
+                            type: 'patient',
+                            content: patientSlot.textContent,
+                            id: patientSlot.dataset.patientId // O ID é o nome do paciente
+                        };
+                    } else if (textSlot && textSlot.value.trim() !== '') {
+                        // É um slot de texto com conteúdo
+                        agendaData[id] = {
+                            type: 'text',
+                            content: textSlot.value.trim()
+                        };
+                    }
+                    // Se for um slot de texto vazio, não é salvo (a chave é omitida)
+                });
+                
+                dbSet('agendaPlanner', agendaData); // Usa a função de criptografia existente
+                showToast('Agenda salva com sucesso!', 'success');
+            }
+
+            /**
+             * [REESCRITO V2.7] Carrega os dados da agenda e renderiza todos os slots.
+             */
+            function carregarAgenda() {
+                const agendaData = dbGet('agendaPlanner', {}); // Usa a função de descriptografia
+                
+                const cells = document.querySelectorAll('#agenda-table .agenda-cell');
+                
+                cells.forEach(cell => {
+                    const id = cell.dataset.id;
+                    const slotData = agendaData[id]; // Pode ser undefined, {type: 'text', ...} ou {type: 'patient', ...}
+                    renderizarSlot(cell, slotData);
+                });
+            }
+            
+            // --- [NOVO V2.7] Funções do Modal da Agenda ---
+
+            /**
+             * [NOVO V2.7] Abre o modal para adicionar um paciente a um slot.
+             * @param {string} slotId - O ID do slot (ex: 'seg-0700').
+             */
+            function abrirModalAgenda(slotId) {
+                // 1. Salvar o slot-alvo
+                agendaModalTargetSlot.value = slotId;
+
+                // 2. Popular o select de pacientes
+                const pacientes = getPacientesDB();
+                agendaModalSelect.innerHTML = '<option value="">-- Selecione um paciente --</option>';
+                pacientes.sort().forEach(nome => {
+                    agendaModalSelect.add(new Option(nome, nome));
+                });
+                
+                // 3. Abrir o modal
+                agendaPatientModal.classList.add('show');
+            }
+
+            /**
+             * [NOVO V2.7] Fecha o modal da agenda.
+             */
+            function fecharModalAgenda() {
+                agendaPatientModal.classList.remove('show');
+                agendaModalTargetSlot.value = '';
+            }
+
+            /**
+             * [NOVO V2.7] Confirma a adição do paciente, renderiza o slot e fecha o modal.
+             */
+            function confirmarAddPacienteAgenda() {
+                const slotId = agendaModalTargetSlot.value;
+                const patientName = agendaModalSelect.value;
+                
+                if (!slotId) {
+                    showToast('Erro: Slot da agenda não encontrado.', 'error');
+                    return;
+                }
+                if (!patientName) {
+                    showToast('Por favor, selecione um paciente.', 'error');
+                    return;
+                }
+
+                const cell = document.querySelector(`.agenda-cell[data-id="${slotId}"]`);
+                if (!cell) {
+                    showToast('Erro: Célula da agenda não encontrada.', 'error');
+                    return;
+                }
+
+                const slotData = {
+                    type: 'patient',
+                    content: patientName,
+                    id: patientName // O ID do paciente é o próprio nome, conforme o sistema
+                };
+                
+                renderizarSlot(cell, slotData);
+                fecharModalAgenda();
+                // Nota: O usuário ainda precisa clicar em "Salvar Agenda" para persistir.
+            }
+            
+            /**
+             * [NOVO V2.7] Handler de eventos delegado para a agenda.
+             * Cuida dos cliques em "+ Paciente", "Remover" e no link do paciente.
+             */
+            function handleAgendaClick(e) {
+                const addBtn = e.target.closest('.btn-add-patient-slot');
+                const removeBtn = e.target.closest('.btn-remove-patient-slot');
+                const patientLink = e.target.closest('.agenda-patient-link');
+
+                if (addBtn) {
+                    // Usuário quer adicionar um paciente
+                    abrirModalAgenda(addBtn.dataset.id);
+                    return;
+                }
+
+                if (removeBtn) {
+                    // Usuário quer remover um paciente (reverter para texto)
+                    const cell = e.target.closest('.agenda-cell');
+                    if (cell) {
+                        // Renderiza como slot de texto vazio
+                        renderizarSlot(cell, { type: 'text', content: '' }); 
+                    }
+                    return;
+                }
+
+                if (patientLink) {
+                    // Usuário clicou no link do paciente
+                    e.preventDefault();
+                    const patientId = patientLink.dataset.patientId;
+                    
+                    // 1. Mudar para a aba de pacientes
+                    mostrarViewPrincipal('pacientes');
+                    
+                    // 2. Selecionar o paciente no select principal
+                    selectPaciente.value = patientId;
+                    
+                    // 3. Disparar o evento de 'change' para carregar o prontuário
+                    // (O 'carregarProntuario' já é o listener desse evento)
+                    selectPaciente.dispatchEvent(new Event('change'));
+
+                    // Opcional: Rolar a tela para o topo
+                    window.scrollTo(0, 0);
+                    
+                    return;
+                }
+            }
+            // --- [FIM DAS MUDANÇAS V2.7] ---
+
+
+        }); // Fim do 'DOMContentLoaded'
+    </script>
+</body>
+</html>
