@@ -7,6 +7,7 @@
     <title>Prontuário de Pacientes (V2.7 - Agenda Integrada)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         /* --- Estilos Globais --- */
         :root {
@@ -864,6 +865,7 @@
         <div id="login-box">
             <h1>Acesso Seguro</h1>
             <p>Digite sua <strong>Senha Mestra</strong>. Ela é sua chave de criptografia. Se for seu primeiro acesso, a senha que você digitar será definida como sua chave.</p>
+            
             <form id="login-form">
                 <div class="login-grupo">
                     <label for="login-password">Senha Mestra (Chave de Criptografia)</label>
@@ -873,8 +875,13 @@
                     <button type="submit" class="btn-primario">Entrar</button>
                 </div>
             </form>
-        </div>
-    </div>
+
+            <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
+                <button id="btn-hard-reset" type="button" class="btn-link" style="font-size: 0.8rem; color: #dc3545;">
+                    Esqueci a senha (Resetar tudo)
+                </button>
+            </div>
+            </div> </div>
 
     <div id="toast-notification">Mensagem</div>
 
@@ -944,11 +951,41 @@
         </div>
     </div>
 
+   <div id="settings-modal" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h2>Segurança</h2>
+            <button type="button" id="settings-close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-grupo">
+                <label>Alterar Senha Mestra</label>
+                <p style="font-size:0.85rem; color:#666; margin-bottom:15px;">Isso irá descriptografar todos os dados e criptografá-los novamente com a nova chave.</p>
+                
+                <input type="password" id="change-pass-old" placeholder="Senha Atual" style="margin-bottom:10px;">
+                <input type="password" id="change-pass-new" placeholder="Nova Senha" style="margin-bottom:10px;">
+                <input type="password" id="change-pass-confirm" placeholder="Confirme a Nova Senha">
+            </div>
+            <div class="botoes-acao" style="justify-content: flex-end;">
+                <button type="button" id="btn-confirmar-troca-senha" class="btn-primario">Atualizar Senha</button>
+            </div>
+            
+            <hr style="margin: 25px 0; border: 0; border-top: 1px solid #eee;">
+            
+            <div style="text-align: center;">
+                <button type="button" id="btn-logout" class="btn-terciario" style="width:100%">Sair (Logout)</button>
+            </div>
+        </div>
+    </div>
+</div>
 
     <div id="app-container">
         <div class="container">
             <div class="app-header">
                 <h1>Plataforma de Prontuários</h1>
+                <button id="btn-settings" style="background:none; border:none; cursor:pointer; font-size:1.5rem; color:#6c757d;" title="Configurações e Senha">
+        ⚙️
+    </button>
             </div>
 
             <div class="tab-nav" style="margin-bottom: 25px;">
@@ -1062,6 +1099,7 @@
                                 <button type="button" id="btn-salvar-sessao" class="btn-primario">Salvar Sessão no Histórico</button>
                                 <button type="button" id="btn-baixar-sessao" class="btn-terciario">Baixar Apenas Esta Sessão (.txt)</button>
                                 <button type="button" id="btn-baixar-historico" class="btn-secundario">Baixar Histórico Completo (.txt)</button>
+				<button type="button" id="btn-baixar-sessao-pdf" class="btn-primario" style="background-color: #6f42c1;">Baixar Sessão (PDF)</button>
                             </div>
                         </form>
                     </div>
@@ -1128,24 +1166,21 @@
                     </div>
 
                     <div id="tab-historico" class="tab-content">
-                        <h3>Histórico de Sessões</h3>
-                        
-                        <div id="historico-busca-container">
-                            <input type="search" id="input-busca-historico" placeholder="Buscar por palavra-chave nas sessões...">
-                            <button type="button" id="btn-limpar-busca" class="btn-terciario">Limpar</button>
-                        </div>
-                        
-                        <ul id="historico-lista" class="historico-lista">
-                            <li id="historico-lista-vazia">Nenhuma sessão registrada para este paciente.</li>
-                        </ul>
-                    </div>
+    <h3>Histórico de Sessões</h3>
+    
+    <div class="botoes-acao" style="margin-bottom: 20px; justify-content: flex-end;">
+        <button type="button" id="btn-baixar-historico-pdf" class="btn-primario" style="background-color: #d63384;">📄 Baixar Histórico Completo (PDF)</button>
+    </div>
 
-                    <div id="tab-progresso" class="tab-content">
-                        <h3>Evolução de Humor vs. Risco</h3>
-                        <div id="moodChart-container">
-                            <canvas id="moodChart"></canvas>
-                        </div>
-                    </div>
+    <div id="historico-busca-container">
+        <input type="search" id="input-busca-historico" placeholder="Buscar por palavra-chave nas sessões...">
+        <button type="button" id="btn-limpar-busca" class="btn-terciario">Limpar</button>
+    </div>
+    
+    <ul id="historico-lista" class="historico-lista">
+        <li id="historico-lista-vazia">Nenhuma sessão registrada para este paciente.</li>
+    </ul>
+</div>
 
                     <div id="tab-perfil" class="tab-content">
                         <form id="perfil-form">
@@ -1512,6 +1547,7 @@
                 document.getElementById('btn-salvar-sessao').addEventListener('click', salvarSessao);
                 document.getElementById('btn-baixar-sessao').addEventListener('click', baixarSessaoAtualTXT);
                 document.getElementById('btn-baixar-historico').addEventListener('click', baixarHistoricoTXT);
+                document.getElementById('btn-baixar-sessao-pdf').addEventListener('click', gerarPDFSessaoAtual);
                 
                 // Aba de Perfil
                 document.getElementById('btn-salvar-perfil').addEventListener('click', salvarPerfil);
@@ -1528,6 +1564,8 @@
                     document.getElementById('input-busca-historico').value = '';
                     filtrarHistorico('');
                 });
+              
+                document.getElementById('btn-baixar-historico-pdf').addEventListener('click', gerarPDFHistoricoCompleto);
                 
                 // --- [MELHORIA 4 - RPD] Listeners do Módulo RPD ---
                 document.getElementById('btn-toggle-rpd-form').addEventListener('click', () => toggleRPDForm(true));
@@ -1738,32 +1776,44 @@
             // --- Funções do Formulário de Prontuário ---
 
             function carregarProntuario() {
-                const nome = selectPaciente.value;
-                if (nome) {
-                    nomePacienteTitulo.textContent = `Prontuário de: ${nome}`;
-                    prontuarioContainer.style.display = 'block';
-                    infoCriticaHeader.style.display = 'grid';
-                    
-                    limparFormularioSessao();
-                    carregarPerfil(nome);
-                    carregarPlanoDeAcaoAnterior(nome);
-                    carregarConceitualizacao(nome); 
-                    carregarHistorico(nome); 
-                    carregarHeaderCritico(nome);
-                    
-                    // [MELHORIA 4 - RPD] Carrega RPDs e reseta form
-                    carregarRPDs(nome);
-                    toggleRPDForm(false); 
-                    // --- Fim da [MELHORIA 4 - RPD] ---
+    const nome = selectPaciente.value;
+    if (nome) {
+        nomePacienteTitulo.textContent = `Prontuário de: ${nome}`;
+        prontuarioContainer.style.display = 'block';
+        infoCriticaHeader.style.display = 'grid';
+        
+        limparFormularioSessao();
+        carregarPerfil(nome);
+        carregarPlanoDeAcaoAnterior(nome);
+        carregarConceitualizacao(nome); 
+        carregarHistorico(nome); 
+        carregarHeaderCritico(nome);
+        
+        // [MELHORIA] Carrega RPDs e reseta form
+        carregarRPDs(nome);
+        toggleRPDForm(false); 
 
-                    // Reseta para a primeira aba (Sessão)
-                    mostrarTab('sessao', document.querySelector('#prontuario-container .tab-link[data-tab="sessao"]'));
+        // [UX UPGRADE] Verifica qual aba está ativa atualmente
+        const abaAtiva = document.querySelector('#prontuario-container .tab-link.active');
+        let tabIdParaMostrar = 'sessao'; // Padrão
 
-                } else {
-                    prontuarioContainer.style.display = 'none';
-                    infoCriticaHeader.style.display = 'none';
-                }
-            }
+        // Se já tiver uma aba ativa (ex: usuário estava lendo histórico), mantém nela
+        if (abaAtiva && abaAtiva.dataset.tab) {
+            tabIdParaMostrar = abaAtiva.dataset.tab;
+        }
+
+        // Se a aba for 'progresso', precisamos recarregar os gráficos para o novo paciente
+        if (tabIdParaMostrar === 'progresso') {
+            carregarGraficosProgresso(nome);
+        }
+
+        mostrarTab(tabIdParaMostrar, document.querySelector(`#prontuario-container .tab-link[data-tab="${tabIdParaMostrar}"]`));
+
+    } else {
+        prontuarioContainer.style.display = 'none';
+        infoCriticaHeader.style.display = 'none';
+    }
+}
             
             function carregarHeaderCritico(nome) {
                 const perfil = getPerfilPaciente(nome);
@@ -2094,29 +2144,44 @@
             }
             
             function renderizarHistorico(listaHistorico) {
-                const listaVazia = document.getElementById('historico-lista-vazia');
-                historicoLista.innerHTML = '';
-                
-                if (listaHistorico.length === 0) {
-                    historicoLista.appendChild(listaVazia);
-                    listaVazia.style.display = 'block';
-                } else {
-                    listaVazia.style.display = 'none';
-                    listaHistorico.forEach(sessao => {
-                        const li = document.createElement('li');
-                        li.className = 'historico-item';
-                        li.dataset.id = sessao.id; 
-                        li.innerHTML = `
-                            <div class="historico-item-info">
-                                <strong>${formatarData(sessao.data)}</strong>
-                                <span>(Humor: ${sessao.humor || 'N/A'})</span>
-                            </div>
-                            <button class="btn-link historico-item-btn" data-id="${sessao.id}">Ver Detalhes</button>
-                        `;
-                        historicoLista.appendChild(li);
-                    });
-                }
-            }
+    // Limpa a lista visualmente
+    historicoLista.innerHTML = '';
+    
+    // Se não houver histórico, injeta o HTML de aviso diretamente
+    if (listaHistorico.length === 0) {
+        historicoLista.innerHTML = `
+            <li id="historico-lista-vazia" style="padding: 20px; text-align: center; color: #888; font-style: italic; background-color: #fdfdfd; border: 1px dashed #dee2e6; border-radius: 6px;">
+                Nenhuma sessão registrada para este paciente.
+            </li>
+        `;
+    } else {
+        // Se houver histórico, renderiza os itens
+        listaHistorico.forEach(sessao => {
+            const li = document.createElement('li');
+            li.className = 'historico-item';
+            li.dataset.id = sessao.id; 
+            
+            // Tratamento visual minimalista para o humor
+            const humorMap = {
+                "Muito Ruim": "😞", "Ruim": "😕", "Neutro": "😐", "Bom": "🙂", "Muito Bom": "😄"
+            };
+            const emoji = humorMap[sessao.humor] || "📝";
+
+            li.innerHTML = `
+                <div class="historico-item-info">
+                    <strong style="color:var(--cor-primaria);">${formatarData(sessao.data)}</strong>
+                    <span style="display:inline-flex; align-items:center; gap:5px; background:#f0f4f8; padding:2px 8px; border-radius:12px; font-size:0.85rem; color:#555;">
+                        ${emoji} ${sessao.humor || 'N/A'}
+                    </span>
+                    ${sessao.riscoNivel && parseInt(sessao.riscoNivel) > 0 ? 
+                        `<span style="color:var(--cor-perigo); font-weight:bold; font-size:0.8rem; margin-left:8px;">⚠️ Risco Nível ${sessao.riscoNivel}</span>` : ''}
+                </div>
+                <button class="btn-link historico-item-btn" data-id="${sessao.id}" style="font-size:0.9rem;">Ver Detalhes</button>
+            `;
+            historicoLista.appendChild(li);
+        });
+    }
+}
             
             function filtrarHistorico(termo) {
                 const nome = selectPaciente.value;
@@ -2626,7 +2691,7 @@
                         event.target.value = null; 
                     }
                 };
-                reader.readText(file);
+                reader.readAsText(file);
             }
             
             
@@ -2880,6 +2945,409 @@
             }
             // --- [FIM DAS MUDANÇAS V2.7] ---
 
+        function gerarPDFSessaoAtual() {
+                const nome = selectPaciente.value;
+                if (!nome) {
+                    showToast('Selecione um paciente.', 'error');
+                    return;
+                }
+            
+                // Pega os dados atuais do formulário
+                const sessao = getSessaoAtualDoForm();
+                if (!sessao) return;
+            
+                // Cria o conteúdo visual do PDF
+                const conteudoPDF = `
+                    <div style="font-family: Helvetica, Arial, sans-serif; padding: 40px; color: #333;">
+                        
+                        <div style="border-bottom: 2px solid #005A9C; padding-bottom: 10px; margin-bottom: 20px;">
+                            <h1 style="color: #005A9C; margin: 0; font-size: 24px;">Registro de Sessão Terapêutica</h1>
+                            <p style="margin: 5px 0 0; color: #666;">Paciente: <strong>${nome}</strong></p>
+                            <p style="margin: 0; color: #666;">Data: ${formatarData(sessao.data)}</p>
+                        </div>
+            
+                        <div style="margin-bottom: 15px;">
+                            <h3 style="color: #17A2B8; border-bottom: 1px solid #ddd; padding-bottom: 5px;">1. Avaliação de Humor e Risco</h3>
+                            <p><strong>Humor:</strong> ${sessao.humor}</p>
+                            <p><strong>Risco (0-5):</strong> Nível ${sessao.riscoNivel} <br>
+                            <span style="font-size: 0.9em; color: #dc3545;">Notas: ${sessao.riscoNotas || 'Nenhuma observação de risco.'}</span></p>
+                        </div>
+            
+                        <div style="margin-bottom: 15px;">
+                            <h3 style="color: #17A2B8; border-bottom: 1px solid #ddd; padding-bottom: 5px;">2. Resumo da Sessão</h3>
+                            <p><strong>Acontecimentos Relevantes:</strong><br>
+                            <span style="white-space: pre-wrap;">${sessao.acontecimentos || 'Não preenchido.'}</span></p>
+                            
+                            <p><strong>Habilidades/Pautas Trabalhadas:</strong><br>
+                            <span style="white-space: pre-wrap;">${sessao.habilidades || 'Não preenchido.'}</span></p>
+                        </div>
+            
+                        <div style="margin-bottom: 15px;">
+                            <h3 style="color: #17A2B8; border-bottom: 1px solid #ddd; padding-bottom: 5px;">3. Plano de Ação</h3>
+                            <p><strong>Status do Plano Anterior:</strong> ${sessao.planoAnteriorStatus}</p>
+                            <p><strong>Novo Plano (Tarefa de Casa):</strong><br>
+                            <div style="background-color: #f8f9fa; padding: 10px; border-left: 4px solid #005A9C; border-radius: 4px;">
+                                <span style="white-space: pre-wrap;">${sessao.planoAcao || 'Nenhum plano definido.'}</span>
+                            </div></p>
+                        </div>
+            
+                        <div style="margin-bottom: 15px;">
+                            <h3 style="color: #17A2B8; border-bottom: 1px solid #ddd; padding-bottom: 5px;">4. Feedback do Paciente</h3>
+                            <p><span style="white-space: pre-wrap;">${sessao.feedback || 'Não houve feedback registrado.'}</span></p>
+                        </div>
+                        
+                        <div style="margin-top: 50px; font-size: 10px; text-align: center; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
+                            Documento gerado eletronicamente em ${new Date().toLocaleString()} - Confidencial.
+                        </div>
+                    </div>
+                `;
+            
+                // Configurações do PDF
+                const opt = {
+                    margin:       0,
+                    filename:     `Sessao_${nome.replace(/\s+/g, '_')}_${sessao.data}.pdf`,
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2 },
+                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+            
+                // Gera e baixa
+                html2pdf().set(opt).from(conteudoPDF).save();
+                
+                showToast('Gerando PDF... Aguarde.', 'success');
+            }
+            // --- FIM DA FUNÇÃO NOVA ---
+
+       // --- [VERSÃO 5.0 - PDF COM CAPA + 1 SESSÃO POR PÁGINA] ---
+            
+            async function gerarPDFHistoricoCompleto() {
+                const nome = selectPaciente.value;
+                if (!nome) {
+                    showToast('Selecione um paciente.', 'error');
+                    return;
+                }
+
+                const historico = getHistoricoPaciente(nome);
+                const perfil = getPerfilPaciente(nome);
+
+                if (historico.length === 0) {
+                    showToast('Não há sessões registradas para gerar o PDF.', 'error');
+                    return;
+                }
+
+                showToast('Gerando PDF organizado (1 sessão/pág)...', 'success');
+
+                // Ordena cronologicamente
+                const historicoOrdenado = [...historico].sort((a, b) => new Date(a.data) - new Date(b.data));
+
+                // Acesso à biblioteca jsPDF
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                // --- CONFIGURAÇÕES GERAIS ---
+                const larguraPagina = 210;
+                const centroX = larguraPagina / 2;
+                const margemEsq = 20;
+                // const margemDir = 190; // Não usado nesta versão sem linhas divisórias
+                const larguraUtil = 170;
+                let y = 20; 
+                const alturaPagina = 297;
+                const margemInferior = 20;
+                
+                // Cores
+                const corPrimaria = [0, 90, 156];   
+                const corCinza = [80, 80, 80];      
+                const corRisco = [220, 53, 69];     
+                const corVerde = [40, 167, 69];     
+
+                // --- FUNÇÕES AUXILIARES ---
+
+                // Verifica quebra de página (para textos longos DENTRO da mesma sessão)
+                function verificarQuebraPagina(alturaNecessaria) {
+                    if (y + alturaNecessaria > alturaPagina - margemInferior) {
+                        doc.addPage();
+                        y = 20; 
+                        return true;
+                    }
+                    return false;
+                }
+
+                function escreverTexto(texto, tamanho = 10, estilo = 'normal', cor = corCinza, recuo = 0) {
+                    doc.setFont("helvetica", estilo);
+                    doc.setFontSize(tamanho);
+                    doc.setTextColor(cor[0], cor[1], cor[2]);
+                    if (!texto) texto = "(Não preenchido)";
+                    
+                    const linhas = doc.splitTextToSize(texto, larguraUtil - recuo);
+                    const alturaBloco = linhas.length * (tamanho * 0.35 + 1); 
+
+                    verificarQuebraPagina(alturaBloco);
+                    doc.text(linhas, margemEsq + recuo, y);
+                    y += alturaBloco + 2; 
+                }
+
+                // ==========================================
+                // === PÁGINA 1: CAPA PROFISSIONAL ===
+                // ==========================================
+                
+                y = 80;
+
+                // Título Principal
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(28);
+                doc.setTextColor(corPrimaria[0], corPrimaria[1], corPrimaria[2]);
+                doc.text("PRONTUÁRIO CLÍNICO", centroX, y, { align: 'center' });
+                y += 12;
+
+                // Subtítulo
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(14);
+                doc.setTextColor(100, 100, 100);
+                doc.text("Relatório de Evolução Terapêutica", centroX, y, { align: 'center' });
+                y += 25;
+
+                // Caixa de Dados
+                doc.setDrawColor(corPrimaria[0], corPrimaria[1], corPrimaria[2]);
+                doc.setFillColor(248, 249, 250); 
+                doc.roundedRect(40, y, 130, 50, 2, 2, 'FD');
+                
+                y += 12;
+                doc.setTextColor(50, 50, 50);
+                doc.setFontSize(10);
+                doc.text("PACIENTE", centroX, y, { align: 'center' });
+                y += 6;
+                doc.setFontSize(16);
+                doc.setFont("helvetica", "bold");
+                doc.text(nome.toUpperCase(), centroX, y, { align: 'center' });
+                y += 12;
+                doc.setFontSize(11);
+                doc.setFont("helvetica", "normal");
+                doc.text(`Idade: ${perfil.idade || 'N/I'} anos`, centroX, y, { align: 'center' });
+                y += 6;
+                doc.text(`Total de Sessões: ${historicoOrdenado.length}`, centroX, y, { align: 'center' });
+                
+                // Rodapé Capa
+                y = 260;
+                doc.setFontSize(9);
+                doc.setTextColor(150, 150, 150);
+                doc.text(`Emitido em: ${new Date().toLocaleDateString()}`, centroX, y, { align: 'center' });
+                y += 5;
+                doc.text("Confidencial - Uso exclusivo profissional", centroX, y, { align: 'center' });
+
+                // ==========================================
+                // === PÁGINA 2 em diante (SESSÕES) ===
+                // ==========================================
+                
+                // Cria a página 2 para receber a primeira sessão
+                doc.addPage(); 
+                y = 20; 
+
+                historicoOrdenado.forEach((sessao, index) => {
+                    
+                    // --- LÓGICA DE NOVA PÁGINA POR SESSÃO ---
+                    // Se NÃO for a primeira sessão (index 0), cria uma página nova.
+                    // A primeira sessão (index 0) aproveita a página criada logo após a capa.
+                    if (index > 0) {
+                        doc.addPage();
+                        y = 20; // Reseta o cursor para o topo da nova página
+                    }
+
+                    // 1. Cabeçalho da Sessão
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(14);
+                    doc.setTextColor(0, 0, 0);
+                    
+                    doc.text(`Sessão #${index + 1} - ${formatarData(sessao.data)}`, margemEsq, y);
+                    y += 6;
+
+                    // Humor
+                    doc.setFontSize(10);
+                    doc.setFont("helvetica", "normal");
+                    doc.setTextColor(100, 100, 100);
+                    doc.text(`Humor relatado: ${sessao.humor}`, margemEsq, y);
+                    y += 15; // Espaço maior para começar o conteúdo
+
+                    // 2. Conteúdo
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(10);
+                    doc.setTextColor(corPrimaria[0], corPrimaria[1], corPrimaria[2]);
+                    doc.text("Acontecimentos e Habilidades", margemEsq, y);
+                    y += 5;
+                    
+                    escreverTexto(sessao.acontecimentos || "Sem registros.", 10, "normal", corCinza);
+                    
+                    if (sessao.habilidades) {
+                        y += 5;
+                        doc.setFont("helvetica", "bold");
+                        doc.setTextColor(50, 50, 50);
+                        doc.text("Foco Técnico:", margemEsq, y);
+                        y += 5;
+                        escreverTexto(sessao.habilidades, 10, "italic", corCinza, 5); 
+                    }
+
+                    // 3. Risco (Sem Emojis)
+                    if ((sessao.riscoNivel && parseInt(sessao.riscoNivel) > 0) || (sessao.riscoNotas && sessao.riscoNotas.length > 0)) {
+                        y += 8;
+                        verificarQuebraPagina(20);
+                        
+                        doc.setFillColor(255, 245, 245); 
+                        doc.setDrawColor(corRisco[0], corRisco[1], corRisco[2]);
+                        doc.roundedRect(margemEsq, y, larguraUtil, 8, 2, 2, 'F'); 
+                        
+                        doc.setFont("helvetica", "bold");
+                        doc.setTextColor(corRisco[0], corRisco[1], corRisco[2]);
+                        y += 5;
+                        
+                        const tituloRisco = `AVALIACAO DE RISCO (Nivel ${sessao.riscoNivel || 0}/5)`;
+                        doc.text(tituloRisco, margemEsq + 2, y);
+                        
+                        y += 5;
+                        escreverTexto(sessao.riscoNotas || "Sem notas detalhadas.", 10, "normal", corRisco, 2);
+                    }
+
+                    // 4. Plano de Ação
+                    y += 8;
+                    doc.setFont("helvetica", "bold");
+                    doc.setTextColor(corVerde[0], corVerde[1], corVerde[2]);
+                    doc.text("Plano de Ação", margemEsq, y);
+                    y += 5;
+                    
+                    const yPlanoInicio = y - 4;
+                    escreverTexto(sessao.planoAcao || "Nenhum plano definido.", 10, "normal", corCinza, 3);
+                    
+                    const alturaPlano = y - yPlanoInicio;
+                    doc.setDrawColor(corVerde[0], corVerde[1], corVerde[2]);
+                    doc.setLineWidth(1);
+                    doc.line(margemEsq, yPlanoInicio, margemEsq, y - 2); 
+                    
+                    y += 2;
+                    doc.setFont("helvetica", "italic");
+                    doc.setFontSize(8);
+                    doc.setTextColor(150, 150, 150);
+                    doc.text(`Status do plano anterior: ${sessao.planoAnteriorStatus}`, margemEsq, y);
+                    
+                    // Fim da iteração: O loop volta, se houver outra sessão, ele dá doc.addPage() lá em cima
+                });
+
+                // Numeração de páginas (Exceto Capa)
+                const totalPaginas = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= totalPaginas; i++) {
+                    doc.setPage(i);
+                    doc.setFontSize(8);
+                    doc.setTextColor(150, 150, 150);
+                    if (i > 1) {
+                        doc.text(`Página ${i} de ${totalPaginas}`, 190, 290, { align: 'right' });
+                    }
+                }
+
+                const nomeArquivo = `Prontuario_${nome.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+                doc.save(nomeArquivo);
+            }
+
+// --- LÓGICA DE GERENCIAMENTO DE SENHA E SETTINGS ---
+
+// 1. Elementos
+const btnSettings = document.getElementById('btn-settings');
+const settingsModal = document.getElementById('settings-modal');
+const settingsClose = document.getElementById('settings-close-btn');
+const btnTrocarSenha = document.getElementById('btn-confirmar-troca-senha');
+const btnLogout = document.getElementById('btn-logout');
+const btnHardReset = document.getElementById('btn-hard-reset');
+
+// 2. Abrir/Fechar Modal
+if(btnSettings) {
+    btnSettings.addEventListener('click', () => settingsModal.classList.add('show'));
+    settingsClose.addEventListener('click', () => settingsModal.classList.remove('show'));
+}
+
+// 3. Função de Trocar Senha (RE-CRIPTOGRAFIA)
+if(btnTrocarSenha) {
+    btnTrocarSenha.addEventListener('click', () => {
+        const oldPass = document.getElementById('change-pass-old').value;
+        const newPass = document.getElementById('change-pass-new').value;
+        const confirmPass = document.getElementById('change-pass-confirm').value;
+
+        // Validações
+        if (oldPass !== appMasterKey) {
+            showToast('A senha atual está incorreta.', 'error');
+            return;
+        }
+        if (newPass.length < 4) {
+            showToast('A nova senha deve ter no mínimo 4 caracteres.', 'error');
+            return;
+        }
+        if (newPass !== confirmPass) {
+            showToast('A confirmação da senha não confere.', 'error');
+            return;
+        }
+
+        // PROCESSO DE MIGRAÇÃO
+        try {
+            // 1. Carregar TODOS os dados com a chave antiga (já estão na memória ou cache, mas vamos garantir)
+            // Como já estamos logados, 'appMasterKey' é a chave antiga.
+            // Vamos ler tudo que é importante.
+            const pacientes = getPacientesDB();
+            const agenda = dbGet('agendaPlanner', {});
+            
+            const dadosCompletos = {};
+            dadosCompletos['pacientesLista'] = pacientes;
+            dadosCompletos['agendaPlanner'] = agenda;
+
+            pacientes.forEach(nome => {
+                dadosCompletos[`prontuario_${nome}`] = getHistoricoPaciente(nome);
+                dadosCompletos[`perfil_${nome}`] = getPerfilPaciente(nome);
+                dadosCompletos[`conceitualizacao_${nome}`] = getConceitualizacaoPaciente(nome);
+                dadosCompletos[`rpd_${nome}`] = getRPDsPaciente(nome);
+            });
+
+            // 2. Limpar o LocalStorage
+            localStorage.clear();
+
+            // 3. Atualizar a chave Mestra Global
+            appMasterKey = newPass;
+
+            // 4. Salvar tudo novamente (a função dbSet usa a appMasterKey atual, que agora é a nova)
+            for (const key in dadosCompletos) {
+                dbSet(key, dadosCompletos[key]);
+            }
+
+            // 5. Sucesso
+            showToast('Senha alterada com sucesso! Todos os dados foram recriptografados.', 'success');
+            settingsModal.classList.remove('show');
+            
+            // Limpa campos
+            document.getElementById('change-pass-old').value = '';
+            document.getElementById('change-pass-new').value = '';
+            document.getElementById('change-pass-confirm').value = '';
+
+        } catch (e) {
+            console.error(e);
+            showToast('Erro crítico ao alterar senha. Faça backup antes.', 'error');
+        }
+    });
+}
+
+// 4. Logout (Apenas recarrega a página)
+if(btnLogout) {
+    btnLogout.addEventListener('click', () => {
+        location.reload();
+    });
+}
+
+// 5. Hard Reset (Na tela de Login)
+if(btnHardReset) {
+    btnHardReset.addEventListener('click', () => {
+        if(confirm("ATENÇÃO: Isso apagará TODOS os dados do navegador para permitir criar uma nova senha. Se você não tiver um backup, os dados serão perdidos para sempre. Confirmar?")) {
+            localStorage.clear();
+            alert("Sistema resetado. Você pode definir uma nova senha agora.");
+            location.reload();
+        }
+    });
+}
 
         }); // Fim do 'DOMContentLoaded'
     </script>
